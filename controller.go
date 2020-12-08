@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
 
@@ -74,6 +75,17 @@ func buildEventRecorder(events typedcorev1.EventInterface) record.EventRecorder 
 	return eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: controllerAgentName})
 }
 
+func cleanString(s string) string {
+	s = strings.ReplaceAll(s, "/", "")
+	s = strings.ReplaceAll(s, ":", "")
+	s = strings.ReplaceAll(s, "_", "")
+	return s
+}
+
+func UUID(foo *v1alpha1.PackageBuild) string {
+	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
+}
+
 func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
 	// foo will be nil if key is deleted from cache
 	if foo == nil {
@@ -100,7 +112,7 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 
 	// Get the deployment with the name specified in Foo.spec
 	// XXX: TODO Change, now pod name === packageName
-	deployment, err := h.podsCache.Get(foo.Namespace, packageName)
+	deployment, err := h.podsCache.Get(foo.Namespace, UUID(foo))
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
 		deployment, err = h.pods.Create(newWorkload(foo))
@@ -196,7 +208,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 
 	return &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      foo.Spec.PackageName,
+			Name:      UUID(foo),
 			Namespace: foo.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(foo, schema.GroupVersionKind{
@@ -207,7 +219,12 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 			},
 		},
 		Spec: corev1.PodSpec{
-
+			InitContainers: []corev1.Container{
+				{
+					Name:  "nginx",
+					Image: "nginx:latest",
+				},
+			},
 			Containers: []corev1.Container{
 				{
 					Name:  "nginx",
