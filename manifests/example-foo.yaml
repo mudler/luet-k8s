@@ -1,0 +1,7 @@
+apiVersion: luet.k8s.io/v1alpha1
+kind: PackageBuild
+metadata:
+  name: test
+spec:
+  packageName: utils/img
+  repository: "https://github.com/mocaccinoOS/mocaccino-extra"
