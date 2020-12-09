@@ -4,7 +4,8 @@ metadata:
   name: test
 spec:
   packageName: container/img
-  repository: "https://github.com/mocaccinoOS/mocaccino-extra"
+  repository: 
+    url: "https://github.com/mocaccinoOS/mocaccino-extra"
   storage:
     enabled: false
     url: "minio_endpoint"
