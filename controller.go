@@ -287,7 +287,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 		ImagePullPolicy: corev1.PullIfNotPresent,
 
 		Name:    "spec-push",
-		Image:   "quay.io/mocaccino/luet-k8s-controller:latest",
+		Image:   "quay.io/mudler/luet-k8s-controller:latest",
 		Command: []string{"/bin/bash", "-ce"},
 		Args:    genMinioCLI(foo),
 
@@ -301,7 +301,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 		ImagePullPolicy: corev1.PullIfNotPresent,
 
 		Name:    "spec-fetch",
-		Image:   "quay.io/mocaccino/luet-k8s-controller:latest",
+		Image:   "quay.io/mudler/luet-k8s-controller:latest",
 		Command: []string{"/bin/bash", "-cxe"},
 		Args:    genGitCommand(foo),
 
@@ -330,7 +330,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 				Value: "luet",
 			},
 		},
-		Image:   "quay.io/mocaccino/luet-k8s-controller:latest", // https://github.com/genuinetools/img/issues/289#issuecomment-626501410
+		Image:   "quay.io/mudler/luet-k8s-controller:latest", // https://github.com/genuinetools/img/issues/289#issuecomment-626501410
 		Command: []string{"/bin/bash", "-ce"},
 		Args:    genLuetCommand(foo),
 		VolumeMounts: []corev1.VolumeMount{

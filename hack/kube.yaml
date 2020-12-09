@@ -107,6 +107,6 @@ spec:
       serviceAccountName: luet-k8s
       containers:
         - name: controller
-          image: "quay.io/mocaccino/luet-k8s-controller:latest"
+          image: "quay.io/mudler/luet-k8s-controller:latest"
           imagePullPolicy: Always
           command: ["/usr/bin/luet-k8s"]
