@@ -84,7 +84,13 @@ func cleanString(s string) string {
 }
 
 func UUID(foo *v1alpha1.PackageBuild) string {
-	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
+	return fmt.Sprintf("%s", foo.Name)
+	//	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
+}
+
+func PodToUUID(pod *corev1.Pod) string {
+	return strings.ReplaceAll(pod.Name, "packagebuild-", "")
+	//	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
 }
 
 func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
@@ -92,6 +98,7 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	if foo == nil {
 		return nil, nil
 	}
+	logrus.Infof("Reconciling '%s' ", foo.Name)
 
 	packageName := foo.Spec.PackageName
 	if packageName == "" {
@@ -102,20 +109,24 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 		return nil, nil
 	}
 
-	repository := foo.Spec.Repository
+	repository := foo.Spec.Repository.Url
 	if repository == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
 		// the resource will be queued again.
-		utilruntime.HandleError(fmt.Errorf("%s: repository name must be specified", key))
+		utilruntime.HandleError(fmt.Errorf("%s: repository url must be specified", key))
 		return nil, nil
 	}
 
 	// Get the deployment with the name specified in Foo.spec
 	// XXX: TODO Change, now pod name === packageName
+	logrus.Infof("Getting pod for '%s' ", foo.Name)
+
 	deployment, err := h.podsCache.Get(foo.Namespace, UUID(foo))
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
+		logrus.Infof("Pod not found for '%s' ", foo.Name)
+
 		deployment, err = h.pods.Create(newWorkload(foo))
 	}
 
@@ -130,6 +141,8 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	// a warning to the event recorder and ret
 	if !metav1.IsControlledBy(deployment, foo) {
 		msg := fmt.Sprintf(MessageResourceExists, foo.Spec.PackageName)
+		logrus.Infof(msg)
+
 		h.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
 		// Notice we don't return an error here, this is intentional because an
 		// error means we should retry to reconcile.  In this situation we've done all
@@ -169,7 +182,7 @@ func (h *Handler) updateStatus(foo *v1alpha1.PackageBuild, pod *corev1.Pod) erro
 	// Or create a copy manually for better performance
 	fooCopy := foo.DeepCopy()
 	fooCopy.Status.State = string(pod.Status.Phase)
-	//fmt.Println("Updating status", fooCopy)
+	logrus.Infof("PackageBuild '%s' has status '%s'", foo.Name, fooCopy.Status.State)
 	// If the CustomResourceSubresources feature gate is not enabled,
 	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
@@ -183,11 +196,14 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 	if pod == nil {
 		return nil, nil
 	}
+	logrus.Infof("Pod '%s' has changed", pod.Name)
 
 	if ownerRef := metav1.GetControllerOf(pod); ownerRef != nil {
 		// If this object is not owned by a Foo, we should not do anything more
 		// with it.
 		if ownerRef.Kind != "PackageBuild" {
+			logrus.Infof("Pod '%s' not owned by PackageBuild", pod.Name)
+
 			return nil, nil
 		}
 
@@ -196,6 +212,7 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 			logrus.Infof("ignoring orphaned object '%s' of PackageBuild '%s'", pod.GetSelfLink(), ownerRef.Name)
 			return nil, nil
 		}
+		logrus.Infof("Enqueueing reconcile for %s", pod.Name)
 
 		h.controller.Enqueue(foo.Namespace, foo.Name)
 		return nil, nil
@@ -221,13 +238,13 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 	case "":
 		return []string{fmt.Sprintf(
 			"git clone %s /repository",
-			foo.Spec.Repository,
+			foo.Spec.Repository.Url,
 		)}
 
 	default:
 		return []string{fmt.Sprintf(
 			"git clone %s /repository && cd /repository && git checkout -b build %s",
-			foo.Spec.Repository,
+			foo.Spec.Repository.Url,
 			foo.Spec.Checkout,
 		)}
 	}
@@ -235,7 +252,7 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 }
 
 func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
-	args := []string{"luet", "build", "--backend", "img", "--destination", "/build", "--tree", "/repository"}
+	args := []string{"luet", "build", "--backend", "img", "--destination", "/build", "--tree", fmt.Sprintf("/repository%s", foo.Spec.Repository.Path)}
 	if foo.Spec.Options.Pull {
 		args = append(args, "--pull")
 	}
@@ -275,7 +292,6 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
 func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
-
 	secUID := int64(1000)
 	if foo.Spec.AsRoot {
 		secUID = int64(0)
@@ -318,7 +334,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 			ProcMount:  &pmount,
 			Privileged: &privileged,
 		},
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		Name:            "spec-build",
 		Env: []corev1.EnvVar{
 			{
@@ -364,6 +380,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 				"container.apparmor.security.beta.kubernetes.io/spec-build": "unconfined",
 				"container.seccomp.security.alpha.kubernetes.io/spec-build": "unconfined",
 			},
+			Labels: foo.Labels,
 		},
 		Spec: corev1.PodSpec{
 			SecurityContext: &corev1.PodSecurityContext{RunAsUser: &secUID},
