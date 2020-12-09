@@ -1,7 +1,7 @@
-FROM golang:alpine as builder
+FROM quay.io/mocaccino/extra as builder
 
 ADD . /luet-k8s
-
+RUN luet install -y lang/go
 RUN cd /luet-k8s && CGO_ENABLED=0 go build
 
 FROM ubuntu:20.04
