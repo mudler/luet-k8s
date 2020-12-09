@@ -23,7 +23,7 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// Foo is a specification for a Foo resource
+// PackageBuild is a specification for a PackageBuild resource
 type PackageBuild struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -32,12 +32,43 @@ type PackageBuild struct {
 	Status BuildStatus `json:"status"`
 }
 
-// FooSpec is the spec for a Foo resource
+type Storage struct {
+	Enabled   bool   `json:"enabled"`
+	APIURL    string `json:"url"`
+	SecretKey string `json:"secretKey"`
+	AccessID  string `json:"accessID"`
+	Bucket    string `json:"bucket"`
+	Path      string `json:"path"`
+}
+
+type BuildOptions struct {
+	Pull       bool `json:"pull"`
+	Clean      bool `json:"clean"`
+	OnlyTarget bool `json:"onlyTarget"`
+	NoDeps     bool `json:"noDeps"`
+
+	Push            bool   `json:"push"`
+	ImageRepository string `json:"imageRepository"`
+}
+
+type RegistryCredentials struct {
+	Enabled  bool   `json:"enabled"`
+	Registry string `json:"registry"` // e.g. quay.io
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// BuildSpec is the spec for a PackageBuild resource
 type BuildSpec struct {
-	PackageName string `json:"packageName"`
-	Repository  string `json:"repository"`
+	PackageName         string              `json:"packageName"`
+	Repository          string              `json:"repository"`
+	Checkout            string              `json:"checkout"`
+	AsRoot              bool                `json:"asRoot"`
+	Storage             Storage             `json:"storage"`
+	Options             BuildOptions        `json:"options"`
+	RegistryCredentials RegistryCredentials `json:"registry"`
 }
 
 type BuildStatus struct {
-	Running int32 `json:"running"`
+	State string `json:"state"`
 }

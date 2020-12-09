@@ -3,5 +3,15 @@ kind: PackageBuild
 metadata:
   name: test
 spec:
-  packageName: utils/img
+  packageName: container/img
   repository: "https://github.com/mocaccinoOS/mocaccino-extra"
+  storage:
+    enabled: false
+    url: "minio_endpoint"
+    secretKey: ""
+    accessID: ""
+    bucket: ""
+    path: ""
+  options:
+    #pull: true
+      #imageRepository: ""

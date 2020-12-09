@@ -79,6 +79,7 @@ func cleanString(s string) string {
 	s = strings.ReplaceAll(s, "/", "")
 	s = strings.ReplaceAll(s, ":", "")
 	s = strings.ReplaceAll(s, "_", "")
+	s = strings.ToLower(s)
 	return s
 }
 
@@ -128,7 +129,7 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	// If the Deployment is not controlled by this Foo resource, we should log
 	// a warning to the event recorder and ret
 	if !metav1.IsControlledBy(deployment, foo) {
-		msg := fmt.Sprintf(MessageResourceExists, deployment.Name)
+		msg := fmt.Sprintf(MessageResourceExists, foo.Spec.PackageName)
 		h.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
 		// Notice we don't return an error here, this is intentional because an
 		// error means we should retry to reconcile.  In this situation we've done all
@@ -147,33 +148,35 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	// If an error occurs during Update, we'll requeue the item so we can
 	// attempt processing again later. THis could have been caused by a
 	// temporary network failure, or any other transient reason.
-	if err != nil {
-		return nil, err
-	}
-
-	// Finally, we update the status block of the Foo resource to reflect the
-	// current state of the world
-	// err = h.updateFooStatus(foo, deployment)
 	// if err != nil {
 	// 	return nil, err
 	// }
 
+	// Finally, we update the status block of the Foo resource to reflect the
+	// current state of the world
+	err = h.updateStatus(foo, deployment)
+	if err != nil {
+		return nil, err
+	}
+
 	return nil, nil
 }
 
-// func (h *Handler) updateFooStatus(foo *luetv1alpha1.PackageBuild, deployment *appsv1.Deployment) error {
-// 	// NEVER modify objects from the store. It's a read-only, local cache.
-// 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
-// 	// Or create a copy manually for better performance
-// 	fooCopy := foo.DeepCopy()
-// 	fooCopy.Status.AvailableReplicas = deployment.Status.AvailableReplicas
-// 	// If the CustomResourceSubresources feature gate is not enabled,
-// 	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
-// 	// UpdateStatus will not allow changes to the Spec of the resource,
-// 	// which is ideal for ensuring nothing other than resource status has been updated.
-// 	_, err := h.foos.Update(fooCopy)
-// 	return err
-// }
+func (h *Handler) updateStatus(foo *v1alpha1.PackageBuild, pod *corev1.Pod) error {
+
+	// NEVER modify objects from the store. It's a read-only, local cache.
+	// You can use DeepCopy() to make a deep copy of original object and modify this copy
+	// Or create a copy manually for better performance
+	fooCopy := foo.DeepCopy()
+	fooCopy.Status.State = string(pod.Status.Phase)
+	//fmt.Println("Updating status", fooCopy)
+	// If the CustomResourceSubresources feature gate is not enabled,
+	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
+	// UpdateStatus will not allow changes to the Spec of the resource,
+	// which is ideal for ensuring nothing other than resource status has been updated.
+	_, err := h.controller.UpdateStatus(fooCopy)
+	return err
+}
 
 func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error) {
 	// When an item is deleted the deployment is nil, just ignore
@@ -184,13 +187,13 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 	if ownerRef := metav1.GetControllerOf(pod); ownerRef != nil {
 		// If this object is not owned by a Foo, we should not do anything more
 		// with it.
-		if ownerRef.Kind != "Foo" {
+		if ownerRef.Kind != "PackageBuild" {
 			return nil, nil
 		}
 
-		foo, err := h.podsCache.Get(pod.Namespace, ownerRef.Name)
+		foo, err := h.podsCache.Get(pod.Namespace, pod.Name)
 		if err != nil {
-			logrus.Infof("ignoring orphaned object '%s' of foo '%s'", pod.GetSelfLink(), ownerRef.Name)
+			logrus.Infof("ignoring orphaned object '%s' of PackageBuild '%s'", pod.GetSelfLink(), ownerRef.Name)
 			return nil, nil
 		}
 
@@ -201,12 +204,152 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 	return nil, nil
 }
 
+func genMinioCLI(foo *v1alpha1.PackageBuild) []string {
+	return []string{fmt.Sprintf(
+		"mc alias set minio %s %s %s && mc cp --recursive %s minio/%s%s",
+		foo.Spec.Storage.APIURL,
+		foo.Spec.Storage.AccessID,
+		foo.Spec.Storage.SecretKey,
+		"/build",
+		foo.Spec.Storage.Bucket,
+		foo.Spec.Storage.Path,
+	)}
+}
+
+func genGitCommand(foo *v1alpha1.PackageBuild) []string {
+	switch foo.Spec.Checkout {
+	case "":
+		return []string{fmt.Sprintf(
+			"git clone %s /repository",
+			foo.Spec.Repository,
+		)}
+
+	default:
+		return []string{fmt.Sprintf(
+			"git clone %s /repository && cd /repository && git checkout -b build %s",
+			foo.Spec.Repository,
+			foo.Spec.Checkout,
+		)}
+	}
+
+}
+
+func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
+	args := []string{"luet", "build", "--backend", "img", "--destination", "/build", "--tree", "/repository"}
+	if foo.Spec.Options.Pull {
+		args = append(args, "--pull")
+	}
+	if foo.Spec.Options.Push {
+		args = append(args, "--push")
+	}
+	if len(foo.Spec.Options.ImageRepository) != 0 {
+		args = append(args, "--image-repository", foo.Spec.Options.ImageRepository)
+	}
+	if foo.Spec.Options.NoDeps {
+		args = append(args, "--nodeps")
+	}
+	if foo.Spec.Options.Clean {
+		args = append(args, "--clean")
+	}
+	if foo.Spec.Options.OnlyTarget {
+		args = append(args, "--only-target-package")
+	}
+
+	args = append(args, foo.Spec.PackageName)
+	if foo.Spec.RegistryCredentials.Enabled {
+		args = append([]string{
+			"img",
+			"login",
+			"-u",
+			foo.Spec.RegistryCredentials.Username,
+			"-p",
+			foo.Spec.RegistryCredentials.Password,
+			foo.Spec.RegistryCredentials.Registry,
+			"&&",
+		}, args...)
+	}
+	return []string{strings.Join(args, " ")}
+}
+
 // newDeployment creates a new Deployment for a Foo resource. It also sets
 // the appropriate OwnerReferences on the resource so handleObject can discover
 // the Foo resource that 'owns' it.
 func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 
-	return &corev1.Pod{
+	secUID := int64(1000)
+	if foo.Spec.AsRoot {
+		secUID = int64(0)
+	}
+	pmount := corev1.UnmaskedProcMount
+	privileged := false
+
+	pushContainer := corev1.Container{
+		ImagePullPolicy: corev1.PullIfNotPresent,
+
+		Name:    "spec-push",
+		Image:   "quay.io/mocaccino/luet-k8s-controller:latest",
+		Command: []string{"/bin/bash", "-cxe"},
+		Args:    genMinioCLI(foo),
+
+		VolumeMounts: []corev1.VolumeMount{{
+			Name:      "buildvolume",
+			MountPath: "/build",
+		}},
+	}
+
+	cloneContainer := corev1.Container{
+		ImagePullPolicy: corev1.PullIfNotPresent,
+
+		Name:    "spec-fetch",
+		Image:   "quay.io/mocaccino/luet-k8s-controller:latest",
+		Command: []string{"/bin/bash", "-cxe"},
+		Args:    genGitCommand(foo),
+
+		VolumeMounts: []corev1.VolumeMount{{
+			Name:      "repository",
+			MountPath: "/repository",
+		}},
+	}
+
+	buildContainer := corev1.Container{
+
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser:  &secUID,
+			ProcMount:  &pmount,
+			Privileged: &privileged,
+		},
+		ImagePullPolicy: corev1.PullIfNotPresent,
+		Name:            "spec-build",
+		Env: []corev1.EnvVar{
+			{
+				Name:  "TMPDIR",
+				Value: "/buildpath",
+			},
+			{
+				Name:  "USER",
+				Value: "luet",
+			},
+		},
+		Image:   "quay.io/mocaccino/luet-k8s-controller:latest", // https://github.com/genuinetools/img/issues/289#issuecomment-626501410
+		Command: []string{"/bin/bash", "-cxe"},
+		Args:    genLuetCommand(foo),
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "buildvolume",
+				MountPath: "/build",
+			},
+			{
+				Name:      "buildpath",
+				MountPath: "/buildpath",
+			},
+			{
+				Name:      "repository",
+				MountPath: "/repository",
+			},
+		},
+	}
+
+	workloadPod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      UUID(foo),
 			Namespace: foo.Namespace,
@@ -217,20 +360,47 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 					Kind:    "PackageBuild",
 				}),
 			},
+			Annotations: map[string]string{
+				"container.apparmor.security.beta.kubernetes.io/spec-build": "unconfined",
+				"container.seccomp.security.alpha.kubernetes.io/spec-build": "unconfined",
+			},
 		},
 		Spec: corev1.PodSpec{
-			InitContainers: []corev1.Container{
+			SecurityContext: &corev1.PodSecurityContext{RunAsUser: &secUID},
+			RestartPolicy:   corev1.RestartPolicyNever,
+			Volumes: []corev1.Volume{
 				{
-					Name:  "nginx",
-					Image: "nginx:latest",
+					Name:         "buildvolume",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 				},
-			},
-			Containers: []corev1.Container{
+
 				{
-					Name:  "nginx",
-					Image: "nginx:latest",
+					Name:         "buildpath",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
+				},
+				{
+					Name:         "repository",
+					VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}},
 				},
 			},
 		},
 	}
+	if foo.Spec.Storage.Enabled {
+		workloadPod.Spec.InitContainers = []corev1.Container{
+			cloneContainer,
+			buildContainer,
+		}
+		workloadPod.Spec.Containers = []corev1.Container{
+			pushContainer,
+		}
+	} else {
+		workloadPod.Spec.InitContainers = []corev1.Container{
+			cloneContainer,
+		}
+		workloadPod.Spec.Containers = []corev1.Container{
+			buildContainer,
+		}
+	}
+
+	return workloadPod
 }

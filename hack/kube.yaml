@@ -1,0 +1,112 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: packagebuilds.luet.k8s.io
+spec:
+  group: luet.k8s.io
+  version: v1alpha1
+  names:
+    kind: PackageBuild
+    plural: packagebuilds
+  scope: Namespaced
+  subresources:
+    status: {}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: luet-k8s
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: luet-k8s
+  namespace: luet-k8s
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: luet-k8s
+rules:
+- apiGroups:
+  - luet.k8s.io
+  resources:
+  - packagebuilds/status
+  verbs:
+  - create
+  - delete
+  - patch
+  - update
+- apiGroups:
+  - luet.k8s.io
+  resources:
+  - packagebuilds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+
+
+---
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: ClusterRoleBinding
+    metadata:
+      name: luet-k8s
+    subjects:
+    - kind: ServiceAccount
+      name: luet-k8s
+      namespace: luet-k8s
+    roleRef:
+      kind: ClusterRole
+      name: luet-k8s
+      apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: controller
+  name: controller
+  namespace: luet-k8s
+spec:
+  selector:
+    matchLabels:
+      app: controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: controller
+      name: controller
+    spec:
+      serviceAccountName: luet-k8s
+      containers:
+        - name: controller
+          image: "quay.io/mocaccino/luet-k8s-controller:latest"
+          imagePullPolicy: Always
+          command: ["/usr/bin/luet-k8s"]
