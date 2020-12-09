@@ -227,7 +227,7 @@ func genMinioCLI(foo *v1alpha1.PackageBuild) []string {
 		foo.Spec.Storage.APIURL,
 		foo.Spec.Storage.AccessID,
 		foo.Spec.Storage.SecretKey,
-		"/build",
+		"/build/*",
 		foo.Spec.Storage.Bucket,
 		foo.Spec.Storage.Path,
 	)}
