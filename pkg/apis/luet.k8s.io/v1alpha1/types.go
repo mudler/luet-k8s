@@ -49,6 +49,7 @@ type BuildOptions struct {
 	Tree            []string `json:"tree"`
 	Push            bool     `json:"push"`
 	ImageRepository string   `json:"imageRepository"`
+	Compression     string   `json:"compression"`
 }
 
 type RegistryCredentials struct {

@@ -271,6 +271,9 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	if foo.Spec.Options.OnlyTarget {
 		args = append(args, "--only-target-package")
 	}
+	if len(foo.Spec.Options.Compression) != 0 {
+		args = append(args, "--compression", foo.Spec.Options.Compression)
+	}
 
 	if len(foo.Spec.Options.Tree) != 0 {
 		for _, t := range foo.Spec.Options.Tree {
