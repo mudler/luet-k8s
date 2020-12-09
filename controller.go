@@ -288,7 +288,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 
 		Name:    "spec-push",
 		Image:   "quay.io/mocaccino/luet-k8s-controller:latest",
-		Command: []string{"/bin/bash", "-cxe"},
+		Command: []string{"/bin/bash", "-ce"},
 		Args:    genMinioCLI(foo),
 
 		VolumeMounts: []corev1.VolumeMount{{
@@ -331,7 +331,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 			},
 		},
 		Image:   "quay.io/mocaccino/luet-k8s-controller:latest", // https://github.com/genuinetools/img/issues/289#issuecomment-626501410
-		Command: []string{"/bin/bash", "-cxe"},
+		Command: []string{"/bin/bash", "-ce"},
 		Args:    genLuetCommand(foo),
 		VolumeMounts: []corev1.VolumeMount{
 			{
