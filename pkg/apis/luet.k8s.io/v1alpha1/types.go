@@ -42,13 +42,13 @@ type Storage struct {
 }
 
 type BuildOptions struct {
-	Pull       bool `json:"pull"`
-	Clean      bool `json:"clean"`
-	OnlyTarget bool `json:"onlyTarget"`
-	NoDeps     bool `json:"noDeps"`
-
-	Push            bool   `json:"push"`
-	ImageRepository string `json:"imageRepository"`
+	Pull            bool     `json:"pull"`
+	Clean           bool     `json:"clean"`
+	OnlyTarget      bool     `json:"onlyTarget"`
+	NoDeps          bool     `json:"noDeps"`
+	Tree            []string `json:"tree"`
+	Push            bool     `json:"push"`
+	ImageRepository string   `json:"imageRepository"`
 }
 
 type RegistryCredentials struct {

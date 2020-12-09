@@ -252,7 +252,7 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 }
 
 func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
-	args := []string{"luet", "build", "--backend", "img", "--destination", "/build", "--tree", fmt.Sprintf("/repository%s", foo.Spec.Repository.Path)}
+	args := []string{"luet", "build", "--backend", "img", "--destination", "/build"}
 	if foo.Spec.Options.Pull {
 		args = append(args, "--pull")
 	}
@@ -270,6 +270,14 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	}
 	if foo.Spec.Options.OnlyTarget {
 		args = append(args, "--only-target-package")
+	}
+
+	if len(foo.Spec.Options.Tree) != 0 {
+		for _, t := range foo.Spec.Options.Tree {
+			args = append(args, "--tree", fmt.Sprintf("/repository%s", t))
+		}
+	} else {
+		args = append(args, "--tree", fmt.Sprintf("/repository%s", foo.Spec.Repository.Path))
 	}
 
 	args = append(args, foo.Spec.PackageName)
