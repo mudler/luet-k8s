@@ -50,6 +50,7 @@ type BuildOptions struct {
 	Push            bool     `json:"push"`
 	ImageRepository string   `json:"imageRepository"`
 	Compression     string   `json:"compression"`
+	Privileged      bool     `json:"privileged"`
 }
 
 type RegistryCredentials struct {
@@ -69,7 +70,6 @@ type Repository struct {
 type BuildSpec struct {
 	PackageName         string              `json:"packageName"`
 	Repository          Repository          `json:"repository"`
-	AsRoot              bool                `json:"asRoot"`
 	Storage             Storage             `json:"storage"`
 	Options             BuildOptions        `json:"options"`
 	RegistryCredentials RegistryCredentials `json:"registry"`

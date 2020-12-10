@@ -304,11 +304,13 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 // the Foo resource that 'owns' it.
 func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	secUID := int64(1000)
+	privileged := false
+
 	if foo.Spec.AsRoot {
 		secUID = int64(0)
+		privileged = true
 	}
 	pmount := corev1.UnmaskedProcMount
-	privileged := false
 
 	podAnnotations := foo.Spec.Annotations
 	if podAnnotations == nil {
