@@ -311,6 +311,9 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	privileged := false
 
 	podAnnotations := foo.Spec.Annotations
+	if podAnnotations == nil {
+		podAnnotations = make(map[string]string)
+	}
 	// Needed by img
 	podAnnotations["container.apparmor.security.beta.kubernetes.io/spec-build"] = "unconfined"
 	podAnnotations["container.seccomp.security.alpha.kubernetes.io/spec-build"] = "unconfined"
