@@ -234,7 +234,7 @@ func genMinioCLI(foo *v1alpha1.PackageBuild) []string {
 }
 
 func genGitCommand(foo *v1alpha1.PackageBuild) []string {
-	switch foo.Spec.Checkout {
+	switch foo.Spec.Repository.Checkout {
 	case "":
 		return []string{fmt.Sprintf(
 			"git clone %s /repository",
@@ -245,7 +245,7 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 		return []string{fmt.Sprintf(
 			"git clone %s /repository && cd /repository && git checkout -b build %s",
 			foo.Spec.Repository.Url,
-			foo.Spec.Checkout,
+			foo.Spec.Repository.Checkout,
 		)}
 	}
 

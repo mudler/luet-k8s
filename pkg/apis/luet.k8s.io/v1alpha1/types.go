@@ -60,15 +60,15 @@ type RegistryCredentials struct {
 }
 
 type Repository struct {
-	Url  string `json:"url"`
-	Path string `json:"path"`
+	Url      string `json:"url"`
+	Path     string `json:"path"`
+	Checkout string `json:"checkout"`
 }
 
 // BuildSpec is the spec for a PackageBuild resource
 type BuildSpec struct {
 	PackageName         string              `json:"packageName"`
 	Repository          Repository          `json:"repository"`
-	Checkout            string              `json:"checkout"`
 	AsRoot              bool                `json:"asRoot"`
 	Storage             Storage             `json:"storage"`
 	Options             BuildOptions        `json:"options"`
