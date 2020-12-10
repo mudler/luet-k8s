@@ -349,7 +349,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	}
 
 	buildContainer := corev1.Container{
-
+		Resources: foo.Spec.Options.Resources,
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser:  &secUID,
 			ProcMount:  &pmount,

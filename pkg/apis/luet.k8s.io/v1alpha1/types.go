@@ -17,6 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -42,15 +44,16 @@ type Storage struct {
 }
 
 type BuildOptions struct {
-	Pull            bool     `json:"pull"`
-	Clean           bool     `json:"clean"`
-	OnlyTarget      bool     `json:"onlyTarget"`
-	NoDeps          bool     `json:"noDeps"`
-	Tree            []string `json:"tree"`
-	Push            bool     `json:"push"`
-	ImageRepository string   `json:"imageRepository"`
-	Compression     string   `json:"compression"`
-	Privileged      bool     `json:"privileged"`
+	Pull            bool                        `json:"pull"`
+	Clean           bool                        `json:"clean"`
+	OnlyTarget      bool                        `json:"onlyTarget"`
+	NoDeps          bool                        `json:"noDeps"`
+	Tree            []string                    `json:"tree"`
+	Push            bool                        `json:"push"`
+	ImageRepository string                      `json:"imageRepository"`
+	Compression     string                      `json:"compression"`
+	Privileged      bool                        `json:"privileged"`
+	Resources       corev1.ResourceRequirements `json:"resources"`
 }
 
 type RegistryCredentials struct {
