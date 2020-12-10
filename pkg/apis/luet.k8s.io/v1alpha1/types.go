@@ -73,6 +73,9 @@ type BuildSpec struct {
 	Storage             Storage             `json:"storage"`
 	Options             BuildOptions        `json:"options"`
 	RegistryCredentials RegistryCredentials `json:"registry"`
+	NodeSelector        map[string]string   `json:"nodeSelector"`
+	Annotations         map[string]string   `json:"annotations"`
+	Labels              map[string]string   `json:"labels"`
 }
 
 type BuildStatus struct {

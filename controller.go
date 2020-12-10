@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
-
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
 	v1 "github.com/mudler/luet-k8s/pkg/generated/controllers/core/v1"
-
 	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io/v1alpha1"
+
 	"github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -310,6 +310,11 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	pmount := corev1.UnmaskedProcMount
 	privileged := false
 
+	podAnnotations := foo.Spec.Annotations
+	// Needed by img
+	podAnnotations["container.apparmor.security.beta.kubernetes.io/spec-build"] = "unconfined"
+	podAnnotations["container.seccomp.security.alpha.kubernetes.io/spec-build"] = "unconfined"
+
 	pushContainer := corev1.Container{
 		ImagePullPolicy: corev1.PullIfNotPresent,
 
@@ -387,13 +392,11 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 					Kind:    "PackageBuild",
 				}),
 			},
-			Annotations: map[string]string{
-				"container.apparmor.security.beta.kubernetes.io/spec-build": "unconfined",
-				"container.seccomp.security.alpha.kubernetes.io/spec-build": "unconfined",
-			},
-			Labels: foo.Labels,
+			Annotations: podAnnotations,
+			Labels:      foo.Spec.Labels,
 		},
 		Spec: corev1.PodSpec{
+			NodeSelector:    foo.Spec.NodeSelector,
 			SecurityContext: &corev1.PodSecurityContext{RunAsUser: &secUID},
 			RestartPolicy:   corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
