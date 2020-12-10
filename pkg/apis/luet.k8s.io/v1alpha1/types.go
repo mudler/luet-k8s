@@ -44,6 +44,11 @@ type Storage struct {
 }
 
 type BuildOptions struct {
+	Color   bool `json:"color"`
+	Spinner bool `json:"spinner"`
+
+	Emoji bool `json:"emoji"`
+
 	Pull            bool                        `json:"pull"`
 	Clean           bool                        `json:"clean"`
 	OnlyTarget      bool                        `json:"onlyTarget"`

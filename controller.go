@@ -275,6 +275,10 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 		args = append(args, "--compression", foo.Spec.Options.Compression)
 	}
 
+	args = append(args, fmt.Sprintf("--emoji=%t", foo.Spec.Options.Emoji))
+	args = append(args, fmt.Sprintf("--color=%t", foo.Spec.Options.Color))
+	args = append(args, fmt.Sprintf("--no-spinner=%t", !foo.Spec.Options.Spinner))
+
 	if len(foo.Spec.Options.Tree) != 0 {
 		for _, t := range foo.Spec.Options.Tree {
 			args = append(args, "--tree", fmt.Sprintf("/repository%s", t))

@@ -32,6 +32,7 @@ func (in *BuildOptions) DeepCopyInto(out *BuildOptions) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	in.Resources.DeepCopyInto(&out.Resources)
 	return
 }
 
