@@ -306,7 +306,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	secUID := int64(1000)
 	privileged := false
 
-	if foo.Spec.AsRoot {
+	if foo.Spec.Options.Privileged {
 		secUID = int64(0)
 		privileged = true
 	}
