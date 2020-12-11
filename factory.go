@@ -129,9 +129,9 @@ func genEnvVars(foo *v1alpha1.PackageBuild) []corev1.EnvVar {
 	}
 
 	if foo.Spec.Storage.FromSecret != "" {
-		addEnvFromSecret("STORAGE_API_URL", foo.Spec.RegistryCredentials.FromSecret, "storageUrl")
-		addEnvFromSecret("STORAGE_API_KEY", foo.Spec.RegistryCredentials.FromSecret, "storageSecretKey")
-		addEnvFromSecret("STORAGE_API_ID", foo.Spec.RegistryCredentials.FromSecret, "storageAccessId")
+		addEnvFromSecret("STORAGE_API_URL", foo.Spec.Storage.FromSecret, "storageUrl")
+		addEnvFromSecret("STORAGE_API_KEY", foo.Spec.Storage.FromSecret, "storageSecretKey")
+		addEnvFromSecret("STORAGE_API_ID", foo.Spec.Storage.FromSecret, "storageAccessId")
 	} else {
 		addEnv("STORAGE_API_URL", foo.Spec.Storage.APIURL)
 		addEnv("STORAGE_API_KEY", foo.Spec.Storage.SecretKey)
