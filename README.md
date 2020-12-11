@@ -1,6 +1,6 @@
 # (experimental) Luet Kubernetes CRD controller
 
-Simple CRD that uses [luet](https://github.com/mudler/luet) and [img](https://github.com/genuinetools/img) to build packages on Kubernetes.
+Simple CRD that uses [luet](https://github.com/mudler/luet) and [img](https://github.com/genuinetools/img) to build packages on Kubernetes. It doesn't require `privileged` permissions, and builds the image as user `1000` in the workload pod.
 
 ## Install
 
