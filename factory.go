@@ -131,7 +131,7 @@ func genEnvVars(foo *v1alpha1.PackageBuild) []corev1.EnvVar {
 	if foo.Spec.Storage.FromSecret != "" {
 		addEnvFromSecret("STORAGE_API_URL", foo.Spec.Storage.FromSecret, "storageUrl")
 		addEnvFromSecret("STORAGE_API_KEY", foo.Spec.Storage.FromSecret, "storageSecretKey")
-		addEnvFromSecret("STORAGE_API_ID", foo.Spec.Storage.FromSecret, "storageAccessId")
+		addEnvFromSecret("STORAGE_API_ID", foo.Spec.Storage.FromSecret, "storageAccessID")
 	} else {
 		addEnv("STORAGE_API_URL", foo.Spec.Storage.APIURL)
 		addEnv("STORAGE_API_KEY", foo.Spec.Storage.SecretKey)
@@ -147,7 +147,7 @@ func genEnvVars(foo *v1alpha1.PackageBuild) []corev1.EnvVar {
 func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	secUID := int64(1000)
 	privileged := false
-
+	serviceAccount := false
 	if foo.Spec.Options.Privileged {
 		secUID = int64(0)
 		privileged = true
@@ -246,9 +246,10 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 			Labels:      foo.Spec.Labels,
 		},
 		Spec: corev1.PodSpec{
-			NodeSelector:    foo.Spec.NodeSelector,
-			SecurityContext: &corev1.PodSecurityContext{RunAsUser: &secUID},
-			RestartPolicy:   corev1.RestartPolicyNever,
+			AutomountServiceAccountToken: &serviceAccount,
+			NodeSelector:                 foo.Spec.NodeSelector,
+			SecurityContext:              &corev1.PodSecurityContext{RunAsUser: &secUID},
+			RestartPolicy:                corev1.RestartPolicyNever,
 			Volumes: []corev1.Volume{
 				{
 					Name:         "buildvolume",
