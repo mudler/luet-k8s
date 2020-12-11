@@ -19,35 +19,34 @@ limitations under the License.
 package v1
 
 import (
-	"github.com/rancher/wrangler/pkg/generic"
+	"github.com/rancher/lasso/pkg/controller"
+	"github.com/rancher/wrangler/pkg/schemes"
 	v1 "k8s.io/api/core/v1"
-	informers "k8s.io/client-go/informers/core/v1"
-	clientset "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func init() {
+	schemes.Register(v1.AddToScheme)
+}
 
 type Interface interface {
 	Node() NodeController
 	Pod() PodController
 }
 
-func New(controllerManager *generic.ControllerManager, client clientset.CoreV1Interface,
-	informers informers.Interface) Interface {
+func New(controllerFactory controller.SharedControllerFactory) Interface {
 	return &version{
-		controllerManager: controllerManager,
-		client:            client,
-		informers:         informers,
+		controllerFactory: controllerFactory,
 	}
 }
 
 type version struct {
-	controllerManager *generic.ControllerManager
-	informers         informers.Interface
-	client            clientset.CoreV1Interface
+	controllerFactory controller.SharedControllerFactory
 }
 
 func (c *version) Node() NodeController {
-	return NewNodeController(v1.SchemeGroupVersion.WithKind("Node"), c.controllerManager, c.client, c.informers.Nodes())
+	return NewNodeController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Node"}, "nodes", false, c.controllerFactory)
 }
 func (c *version) Pod() PodController {
-	return NewPodController(v1.SchemeGroupVersion.WithKind("Pod"), c.controllerManager, c.client, c.informers.Pods())
+	return NewPodController(schema.GroupVersionKind{Group: "", Version: "v1", Kind: "Pod"}, "pods", true, c.controllerFactory)
 }

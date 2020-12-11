@@ -35,12 +35,13 @@ type PackageBuild struct {
 }
 
 type Storage struct {
-	Enabled   bool   `json:"enabled"`
-	APIURL    string `json:"url"`
-	SecretKey string `json:"secretKey"`
-	AccessID  string `json:"accessID"`
-	Bucket    string `json:"bucket"`
-	Path      string `json:"path"`
+	Enabled    bool   `json:"enabled"`
+	APIURL     string `json:"url"`
+	SecretKey  string `json:"secretKey"`
+	AccessID   string `json:"accessID"`
+	Bucket     string `json:"bucket"`
+	Path       string `json:"path"`
+	FromSecret string `json:"fromSecret"`
 }
 
 type BuildOptions struct {
@@ -62,10 +63,11 @@ type BuildOptions struct {
 }
 
 type RegistryCredentials struct {
-	Enabled  bool   `json:"enabled"`
-	Registry string `json:"registry"` // e.g. quay.io
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Enabled    bool   `json:"enabled"`
+	Registry   string `json:"registry"` // e.g. quay.io
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	FromSecret string `json:"fromSecret"`
 }
 
 type Repository struct {

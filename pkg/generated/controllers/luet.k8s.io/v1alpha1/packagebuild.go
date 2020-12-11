@@ -23,9 +23,8 @@ import (
 	"time"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
-	clientset "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/luet.k8s.io/v1alpha1"
-	informers "github.com/mudler/luet-k8s/pkg/generated/informers/externalversions/luet.k8s.io/v1alpha1"
-	listers "github.com/mudler/luet-k8s/pkg/generated/listers/luet.k8s.io/v1alpha1"
+	"github.com/rancher/lasso/pkg/client"
+	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/apply"
 	"github.com/rancher/wrangler/pkg/condition"
 	"github.com/rancher/wrangler/pkg/generic"
@@ -78,18 +77,22 @@ type PackageBuildCache interface {
 type PackageBuildIndexer func(obj *v1alpha1.PackageBuild) ([]string, error)
 
 type packageBuildController struct {
-	controllerManager *generic.ControllerManager
-	clientGetter      clientset.PackageBuildsGetter
-	informer          informers.PackageBuildInformer
-	gvk               schema.GroupVersionKind
+	controller    controller.SharedController
+	client        *client.Client
+	gvk           schema.GroupVersionKind
+	groupResource schema.GroupResource
 }
 
-func NewPackageBuildController(gvk schema.GroupVersionKind, controllerManager *generic.ControllerManager, clientGetter clientset.PackageBuildsGetter, informer informers.PackageBuildInformer) PackageBuildController {
+func NewPackageBuildController(gvk schema.GroupVersionKind, resource string, namespaced bool, controller controller.SharedControllerFactory) PackageBuildController {
+	c := controller.ForResourceKind(gvk.GroupVersion().WithResource(resource), gvk.Kind, namespaced)
 	return &packageBuildController{
-		controllerManager: controllerManager,
-		clientGetter:      clientGetter,
-		informer:          informer,
-		gvk:               gvk,
+		controller: c,
+		client:     c.Client(),
+		gvk:        gvk,
+		groupResource: schema.GroupResource{
+			Group:    gvk.Group,
+			Resource: resource,
+		},
 	}
 }
 
@@ -136,12 +139,11 @@ func UpdatePackageBuildDeepCopyOnChange(client PackageBuildClient, obj *v1alpha1
 }
 
 func (c *packageBuildController) AddGenericHandler(ctx context.Context, name string, handler generic.Handler) {
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, handler)
+	c.controller.RegisterHandler(ctx, name, controller.SharedControllerHandlerFunc(handler))
 }
 
 func (c *packageBuildController) AddGenericRemoveHandler(ctx context.Context, name string, handler generic.Handler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), handler)
-	c.controllerManager.AddHandler(ctx, c.gvk, c.informer.Informer(), name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), handler))
 }
 
 func (c *packageBuildController) OnChange(ctx context.Context, name string, sync PackageBuildHandler) {
@@ -149,20 +151,19 @@ func (c *packageBuildController) OnChange(ctx context.Context, name string, sync
 }
 
 func (c *packageBuildController) OnRemove(ctx context.Context, name string, sync PackageBuildHandler) {
-	removeHandler := generic.NewRemoveHandler(name, c.Updater(), FromPackageBuildHandlerToHandler(sync))
-	c.AddGenericHandler(ctx, name, removeHandler)
+	c.AddGenericHandler(ctx, name, generic.NewRemoveHandler(name, c.Updater(), FromPackageBuildHandlerToHandler(sync)))
 }
 
 func (c *packageBuildController) Enqueue(namespace, name string) {
-	c.controllerManager.Enqueue(c.gvk, c.informer.Informer(), namespace, name)
+	c.controller.Enqueue(namespace, name)
 }
 
 func (c *packageBuildController) EnqueueAfter(namespace, name string, duration time.Duration) {
-	c.controllerManager.EnqueueAfter(c.gvk, c.informer.Informer(), namespace, name, duration)
+	c.controller.EnqueueAfter(namespace, name, duration)
 }
 
 func (c *packageBuildController) Informer() cache.SharedIndexInformer {
-	return c.informer.Informer()
+	return c.controller.Informer()
 }
 
 func (c *packageBuildController) GroupVersionKind() schema.GroupVersionKind {
@@ -171,57 +172,75 @@ func (c *packageBuildController) GroupVersionKind() schema.GroupVersionKind {
 
 func (c *packageBuildController) Cache() PackageBuildCache {
 	return &packageBuildCache{
-		lister:  c.informer.Lister(),
-		indexer: c.informer.Informer().GetIndexer(),
+		indexer:  c.Informer().GetIndexer(),
+		resource: c.groupResource,
 	}
 }
 
 func (c *packageBuildController) Create(obj *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
-	return c.clientGetter.PackageBuilds(obj.Namespace).Create(context.TODO(), obj, metav1.CreateOptions{})
+	result := &v1alpha1.PackageBuild{}
+	return result, c.client.Create(context.TODO(), obj.Namespace, obj, result, metav1.CreateOptions{})
 }
 
 func (c *packageBuildController) Update(obj *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
-	return c.clientGetter.PackageBuilds(obj.Namespace).Update(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1alpha1.PackageBuild{}
+	return result, c.client.Update(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
 func (c *packageBuildController) UpdateStatus(obj *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
-	return c.clientGetter.PackageBuilds(obj.Namespace).UpdateStatus(context.TODO(), obj, metav1.UpdateOptions{})
+	result := &v1alpha1.PackageBuild{}
+	return result, c.client.UpdateStatus(context.TODO(), obj.Namespace, obj, result, metav1.UpdateOptions{})
 }
 
 func (c *packageBuildController) Delete(namespace, name string, options *metav1.DeleteOptions) error {
 	if options == nil {
 		options = &metav1.DeleteOptions{}
 	}
-	return c.clientGetter.PackageBuilds(namespace).Delete(context.TODO(), name, *options)
+	return c.client.Delete(context.TODO(), namespace, name, *options)
 }
 
 func (c *packageBuildController) Get(namespace, name string, options metav1.GetOptions) (*v1alpha1.PackageBuild, error) {
-	return c.clientGetter.PackageBuilds(namespace).Get(context.TODO(), name, options)
+	result := &v1alpha1.PackageBuild{}
+	return result, c.client.Get(context.TODO(), namespace, name, result, options)
 }
 
 func (c *packageBuildController) List(namespace string, opts metav1.ListOptions) (*v1alpha1.PackageBuildList, error) {
-	return c.clientGetter.PackageBuilds(namespace).List(context.TODO(), opts)
+	result := &v1alpha1.PackageBuildList{}
+	return result, c.client.List(context.TODO(), namespace, result, opts)
 }
 
 func (c *packageBuildController) Watch(namespace string, opts metav1.ListOptions) (watch.Interface, error) {
-	return c.clientGetter.PackageBuilds(namespace).Watch(context.TODO(), opts)
+	return c.client.Watch(context.TODO(), namespace, opts)
 }
 
-func (c *packageBuildController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (result *v1alpha1.PackageBuild, err error) {
-	return c.clientGetter.PackageBuilds(namespace).Patch(context.TODO(), name, pt, data, metav1.PatchOptions{}, subresources...)
+func (c *packageBuildController) Patch(namespace, name string, pt types.PatchType, data []byte, subresources ...string) (*v1alpha1.PackageBuild, error) {
+	result := &v1alpha1.PackageBuild{}
+	return result, c.client.Patch(context.TODO(), namespace, name, pt, data, result, metav1.PatchOptions{}, subresources...)
 }
 
 type packageBuildCache struct {
-	lister  listers.PackageBuildLister
-	indexer cache.Indexer
+	indexer  cache.Indexer
+	resource schema.GroupResource
 }
 
 func (c *packageBuildCache) Get(namespace, name string) (*v1alpha1.PackageBuild, error) {
-	return c.lister.PackageBuilds(namespace).Get(name)
+	obj, exists, err := c.indexer.GetByKey(namespace + "/" + name)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.NewNotFound(c.resource, name)
+	}
+	return obj.(*v1alpha1.PackageBuild), nil
 }
 
-func (c *packageBuildCache) List(namespace string, selector labels.Selector) ([]*v1alpha1.PackageBuild, error) {
-	return c.lister.PackageBuilds(namespace).List(selector)
+func (c *packageBuildCache) List(namespace string, selector labels.Selector) (ret []*v1alpha1.PackageBuild, err error) {
+
+	err = cache.ListAllByNamespace(c.indexer, namespace, selector, func(m interface{}) {
+		ret = append(ret, m.(*v1alpha1.PackageBuild))
+	})
+
+	return ret, err
 }
 
 func (c *packageBuildCache) AddIndexer(indexName string, indexer PackageBuildIndexer) {
@@ -299,11 +318,19 @@ func (a *packageBuildStatusHandler) sync(key string, obj *v1alpha1.PackageBuild)
 		}
 	}
 	if !equality.Semantic.DeepEqual(origStatus, &newStatus) {
+		if a.condition != "" {
+			// Since status has changed, update the lastUpdatedTime
+			a.condition.LastUpdated(&newStatus, time.Now().UTC().Format(time.RFC3339))
+		}
+
 		var newErr error
 		obj.Status = newStatus
-		obj, newErr = a.client.UpdateStatus(obj)
+		newObj, newErr := a.client.UpdateStatus(obj)
 		if err == nil {
 			err = newErr
+		}
+		if newErr == nil {
+			obj = newObj
 		}
 	}
 	return obj, err
