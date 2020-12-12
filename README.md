@@ -72,6 +72,8 @@ spec:
     pull: true
     clean: true
     onlyTarget: true
+    full: true
+    all: true
     privileged: true
     compression: "gzip"
     resources:

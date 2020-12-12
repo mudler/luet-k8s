@@ -50,6 +50,9 @@ type BuildOptions struct {
 
 	Emoji bool `json:"emoji"`
 
+	Full bool `json:"full"`
+	All  bool `json:"all"`
+
 	Pull            bool                        `json:"pull"`
 	Clean           bool                        `json:"clean"`
 	OnlyTarget      bool                        `json:"onlyTarget"`

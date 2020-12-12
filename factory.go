@@ -65,6 +65,14 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 		args = append(args, "--compression", foo.Spec.Options.Compression)
 	}
 
+	if foo.Spec.Options.Full {
+		args = append(args, "--full")
+	}
+
+	if foo.Spec.Options.All {
+		args = append(args, "--all")
+	}
+
 	args = append(args, fmt.Sprintf("--emoji=%t", foo.Spec.Options.Emoji))
 	args = append(args, fmt.Sprintf("--color=%t", foo.Spec.Options.Color))
 	args = append(args, fmt.Sprintf("--no-spinner=%t", !foo.Spec.Options.Spinner))
@@ -77,7 +85,10 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 		args = append(args, "--tree", fmt.Sprintf("/repository%s", foo.Spec.Repository.Path))
 	}
 
-	args = append(args, foo.Spec.PackageName)
+	if foo.Spec.PackageName != "" {
+		args = append(args, foo.Spec.PackageName)
+	}
+
 	if foo.Spec.RegistryCredentials.Enabled {
 		args = append([]string{
 			"img",
