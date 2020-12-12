@@ -82,6 +82,7 @@ type Repository struct {
 // BuildSpec is the spec for a PackageBuild resource
 type BuildSpec struct {
 	PackageName         string              `json:"packageName"`
+	Packages            []string            `json:"packages"`
 	Repository          Repository          `json:"repository"`
 	Storage             Storage             `json:"storage"`
 	Options             BuildOptions        `json:"options"`

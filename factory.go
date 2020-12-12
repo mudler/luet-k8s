@@ -89,6 +89,10 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 		args = append(args, foo.Spec.PackageName)
 	}
 
+	for _, p := range foo.Spec.Packages {
+		args = append(args, p)
+	}
+
 	if foo.Spec.RegistryCredentials.Enabled {
 		args = append([]string{
 			"img",
