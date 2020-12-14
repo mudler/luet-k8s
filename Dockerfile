@@ -10,7 +10,7 @@ ENV LUET_YES=true
 
 RUN apt-get install -y uidmap curl wget git libcap2-bin
 RUN curl https://get.mocaccino.org/luet/get_luet_root.sh | sh
-RUN luet install repository/mocaccino-extra && luet install container/img net-fs/minio-client && luet upgrade
+RUN luet install repository/mocaccino-extra-stable && luet install container/img net-fs/minio-client && luet upgrade
 RUN chmod u-s /usr/bin/new[gu]idmap && \
     setcap cap_setuid+eip /usr/bin/newuidmap && \
     setcap cap_setgid+eip /usr/bin/newgidmap 
