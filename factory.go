@@ -55,9 +55,7 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	if foo.Spec.Options.NoDeps {
 		args = append(args, "--nodeps")
 	}
-	if foo.Spec.Options.Clean {
-		args = append(args, "--clean")
-	}
+
 	if foo.Spec.Options.OnlyTarget {
 		args = append(args, "--only-target-package")
 	}

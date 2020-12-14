@@ -54,7 +54,6 @@ type BuildOptions struct {
 	All  bool `json:"all"`
 
 	Pull            bool                        `json:"pull"`
-	Clean           bool                        `json:"clean"`
 	OnlyTarget      bool                        `json:"onlyTarget"`
 	NoDeps          bool                        `json:"noDeps"`
 	Tree            []string                    `json:"tree"`
