@@ -81,10 +81,10 @@ spec:
     resources:
         requests:
             cpu: "100m"
-            ram: "200Mi"
+            memory: "200Mi"
         limits:
             cpu: "10m"
-            ram: "1Mi"
+            memory: "1Mi"
     push: true
     tree:
     - /tree/path
