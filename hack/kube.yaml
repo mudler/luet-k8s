@@ -18,15 +18,21 @@ metadata:
   name: luet-k8s
 ---
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: luet-build
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: luet-k8s
   namespace: luet-k8s
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: luet-k8s
+  namespace: luet-k8s
 rules:
 - apiGroups:
   - luet.k8s.io
@@ -60,29 +66,89 @@ rules:
   - list
   - update
   - watch
-
 - apiGroups:
   - ""
   resources:
   - events
   verbs:
   - create
-
-
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: luet-k8s
+  namespace: luet-build
+rules:
+- apiGroups:
+  - luet.k8s.io
+  resources:
+  - packagebuilds/status
+  verbs:
+  - create
+  - delete
+  - patch
+  - update
+- apiGroups:
+  - luet.k8s.io
+  resources:
+  - packagebuilds
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
 ---
 apiVersion: v1
 kind: List
 items:
   - apiVersion: rbac.authorization.k8s.io/v1
-    kind: ClusterRoleBinding
+    kind: RoleBinding
     metadata:
       name: luet-k8s
+      namespace: luet-k8s
     subjects:
     - kind: ServiceAccount
       name: luet-k8s
       namespace: luet-k8s
     roleRef:
-      kind: ClusterRole
+      kind: Role
+      name: luet-k8s
+      apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: luet-k8s
+      namespace: luet-build
+    subjects:
+    - kind: ServiceAccount
+      name: luet-k8s
+      namespace: luet-k8s
+    roleRef:
+      kind: Role
       name: luet-k8s
       apiGroup: rbac.authorization.k8s.io
 ---
