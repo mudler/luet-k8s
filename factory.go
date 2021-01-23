@@ -42,7 +42,7 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 }
 
 func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
-	args := []string{"luet", "build", "--backend", "img", "--destination", "/build"}
+	args := []string{"luet", "--version", "&&", "luet", "build", "--backend", "img", "--destination", "/build"}
 	if foo.Spec.Options.Pull {
 		args = append(args, "--pull")
 	}
@@ -59,6 +59,11 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	if foo.Spec.Options.OnlyTarget {
 		args = append(args, "--only-target-package")
 	}
+
+	if foo.Spec.Options.Debug {
+		args = append(args, "--debug")
+	}
+
 	if len(foo.Spec.Options.Compression) != 0 {
 		args = append(args, "--compression", foo.Spec.Options.Compression)
 	}
@@ -89,6 +94,86 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 
 	for _, p := range foo.Spec.Packages {
 		args = append(args, p)
+	}
+
+	if foo.Spec.RegistryCredentials.Enabled {
+		args = append([]string{
+			"img",
+			"login",
+			"-u",
+			"$REGISTRY_USERNAME",
+			"-p",
+			"$REGISTRY_PASSWORD",
+			"$REGISTRY_URI",
+			"&&",
+		}, args...)
+	}
+	return []string{strings.Join(args, " ")}
+}
+
+func genCreateRepoCommand(foo *v1alpha1.PackageBuild) []string {
+	args := []string{"luet", "--version", "&&", "luet", "create-repo", "--backend", "img", "--packages", "/build"}
+
+	if foo.Spec.LuetRepository.Type == "docker" {
+		args = append(args, "--output", foo.Spec.LuetRepository.OutputImage)
+	} else {
+		args = append(args, "--output", "/build")
+	}
+
+	if foo.Spec.LuetRepository.ForcePush {
+		args = append(args, "--force-push")
+	}
+
+	if foo.Spec.LuetRepository.PushImages {
+		args = append(args, "--push-images")
+	}
+
+	for _, t := range foo.Spec.LuetRepository.Urls {
+		args = append(args, "--urls", t)
+	}
+
+	if len(foo.Spec.LuetRepository.Description) != 0 {
+		args = append(args, "--descr", foo.Spec.LuetRepository.Description)
+	}
+
+	if len(foo.Spec.LuetRepository.TreeCompression) != 0 {
+		args = append(args, "--tree-compression", foo.Spec.LuetRepository.TreeCompression)
+	}
+
+	if len(foo.Spec.LuetRepository.TreeFileName) != 0 {
+		args = append(args, "--tree-filename", foo.Spec.LuetRepository.TreeFileName)
+	}
+
+	if len(foo.Spec.LuetRepository.MetaCompression) != 0 {
+		args = append(args, "--meta-compression", foo.Spec.LuetRepository.MetaCompression)
+	}
+
+	if len(foo.Spec.LuetRepository.MetaFileName) != 0 {
+		args = append(args, "--meta-filename", foo.Spec.LuetRepository.MetaFileName)
+	}
+
+	if len(foo.Spec.LuetRepository.Name) != 0 {
+		args = append(args, "--name", foo.Spec.LuetRepository.Name)
+	}
+
+	if len(foo.Spec.LuetRepository.Type) != 0 {
+		args = append(args, "--type", foo.Spec.LuetRepository.Type)
+	}
+
+	if foo.Spec.Options.Debug {
+		args = append(args, "--debug")
+	}
+
+	args = append(args, fmt.Sprintf("--emoji=%t", foo.Spec.Options.Emoji))
+	args = append(args, fmt.Sprintf("--color=%t", foo.Spec.Options.Color))
+	args = append(args, fmt.Sprintf("--no-spinner=%t", !foo.Spec.Options.Spinner))
+
+	if len(foo.Spec.Options.Tree) != 0 {
+		for _, t := range foo.Spec.Options.Tree {
+			args = append(args, "--tree", fmt.Sprintf("/repository%s", t))
+		}
+	} else {
+		args = append(args, "--tree", fmt.Sprintf("/repository%s", foo.Spec.Repository.Path))
 	}
 
 	if foo.Spec.RegistryCredentials.Enabled {
@@ -171,6 +256,7 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 	if podAnnotations == nil {
 		podAnnotations = make(map[string]string)
 	}
+
 	// Needed by img
 	podAnnotations["container.apparmor.security.beta.kubernetes.io/spec-build"] = "unconfined"
 	podAnnotations["container.seccomp.security.alpha.kubernetes.io/spec-build"] = "unconfined"
@@ -186,8 +272,9 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 			Value: "luet",
 		},
 	}...)
+
 	pushContainer := corev1.Container{
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 		Env:             envs,
 		Name:            "spec-push",
 		Image:           "quay.io/mudler/luet-k8s-controller:latest",
@@ -200,8 +287,28 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 		}},
 	}
 
+	createRepoContainer := corev1.Container{
+		ImagePullPolicy: corev1.PullAlways,
+		Env:             envs,
+		Name:            "spec-create-repo",
+		Image:           "quay.io/mudler/luet-k8s-controller:latest",
+		Command:         []string{"/bin/bash", "-ce"},
+		Args:            genCreateRepoCommand(foo),
+
+		VolumeMounts: []corev1.VolumeMount{
+			{
+				Name:      "buildvolume",
+				MountPath: "/build",
+			},
+			{
+				Name:      "repository",
+				MountPath: "/repository",
+			},
+		},
+	}
+
 	cloneContainer := corev1.Container{
-		ImagePullPolicy: corev1.PullIfNotPresent,
+		ImagePullPolicy: corev1.PullAlways,
 
 		Name:    "spec-fetch",
 		Image:   "quay.io/mudler/luet-k8s-controller:latest",
@@ -295,6 +402,10 @@ func newWorkload(foo *v1alpha1.PackageBuild) *corev1.Pod {
 		workloadPod.Spec.Containers = []corev1.Container{
 			buildContainer,
 		}
+	}
+
+	if foo.Spec.LuetRepository.Enabled {
+		workloadPod.Spec.InitContainers = append(workloadPod.Spec.InitContainers, createRepoContainer)
 	}
 
 	return workloadPod

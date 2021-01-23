@@ -53,15 +53,34 @@ type BuildOptions struct {
 	Full bool `json:"full"`
 	All  bool `json:"all"`
 
-	Pull            bool                        `json:"pull"`
-	OnlyTarget      bool                        `json:"onlyTarget"`
-	NoDeps          bool                        `json:"noDeps"`
-	Tree            []string                    `json:"tree"`
+	Pull       bool     `json:"pull"`
+	OnlyTarget bool     `json:"onlyTarget"`
+	NoDeps     bool     `json:"noDeps"`
+	Tree       []string `json:"tree"`
+	Debug      bool     `json:"debug"`
+
 	Push            bool                        `json:"push"`
 	ImageRepository string                      `json:"imageRepository"`
 	Compression     string                      `json:"compression"`
 	Privileged      bool                        `json:"privileged"`
 	Resources       corev1.ResourceRequirements `json:"resources"`
+}
+
+type CreateRepositoryOptions struct {
+	Enabled         bool     `json:"enabled"`
+	Type            string   `json:"type"`
+	Urls            []string `json:"urls"`
+	TreeCompression string   `json:"treeCompression"`
+	TreeFileName    string   `json:"treeFileName"`
+
+	MetaCompression string `json:"metaCompression"`
+	MetaFileName    string `json:"metaFileName"`
+
+	PushImages  bool   `json:"pushImages"`
+	ForcePush   bool   `json:"forcePush"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
+	OutputImage string `json:"image"`
 }
 
 type RegistryCredentials struct {
@@ -80,15 +99,16 @@ type Repository struct {
 
 // BuildSpec is the spec for a PackageBuild resource
 type BuildSpec struct {
-	PackageName         string              `json:"packageName"`
-	Packages            []string            `json:"packages"`
-	Repository          Repository          `json:"repository"`
-	Storage             Storage             `json:"storage"`
-	Options             BuildOptions        `json:"options"`
-	RegistryCredentials RegistryCredentials `json:"registry"`
-	NodeSelector        map[string]string   `json:"nodeSelector"`
-	Annotations         map[string]string   `json:"annotations"`
-	Labels              map[string]string   `json:"labels"`
+	PackageName         string                  `json:"packageName"`
+	Packages            []string                `json:"packages"`
+	Repository          Repository              `json:"repository"`
+	Storage             Storage                 `json:"storage"`
+	Options             BuildOptions            `json:"options"`
+	RegistryCredentials RegistryCredentials     `json:"registry"`
+	NodeSelector        map[string]string       `json:"nodeSelector"`
+	Annotations         map[string]string       `json:"annotations"`
+	Labels              map[string]string       `json:"labels"`
+	LuetRepository      CreateRepositoryOptions `json:"luetRepository"`
 }
 
 type BuildStatus struct {
