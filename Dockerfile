@@ -7,7 +7,7 @@ RUN cd /luet-k8s && CGO_ENABLED=0 go build
 FROM ubuntu:20.04
 RUN apt-get update
 ENV LUET_YES=true
-
+ENV LUET_DEBUG=true
 RUN apt-get install -y uidmap curl wget git libcap2-bin
 RUN curl https://get.mocaccino.org/luet/get_luet_root.sh | sh
 RUN chmod u-s /usr/bin/new[gu]idmap && \
