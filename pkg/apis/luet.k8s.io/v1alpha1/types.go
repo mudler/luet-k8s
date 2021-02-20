@@ -62,7 +62,7 @@ type BuildOptions struct {
 	NoDeps     bool     `json:"noDeps"`
 	Tree       []string `json:"tree"`
 	Debug      bool     `json:"debug"`
-	LiveOutput bool     `json:"liveOutput`
+	LiveOutput bool     `json:"liveOutput"`
 
 	Push            bool                        `json:"push"`
 	ImageRepository string                      `json:"imageRepository"`
