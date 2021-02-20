@@ -11,6 +11,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+const (
+	ImgBackend    = "img"
+	DockerBackend = "docker"
+)
+
 func genMinioCLI(foo *v1alpha1.PackageBuild) []string {
 	return []string{fmt.Sprintf(
 		"mc alias set minio %s %s %s && mc cp --recursive %s minio/%s%s",
@@ -42,7 +47,9 @@ func genGitCommand(foo *v1alpha1.PackageBuild) []string {
 }
 
 func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
-	args := []string{"luet", "--version", "&&", "luet", "build", "--backend", "img", "--destination", "/build"}
+	args := []string{"luet", "--version", "&&", "luet", "build", "--destination", "/build"}
+	args = append(args, "--backend", foo.Spec.Options.GetBackend())
+
 	if foo.Spec.Options.Pull {
 		args = append(args, "--pull")
 	}
@@ -52,8 +59,13 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	if len(foo.Spec.Options.ImageRepository) != 0 {
 		args = append(args, "--image-repository", foo.Spec.Options.ImageRepository)
 	}
+
 	if foo.Spec.Options.NoDeps {
 		args = append(args, "--nodeps")
+	}
+
+	if foo.Spec.Options.LiveOutput {
+		args = append(args, "--live-output")
 	}
 
 	if foo.Spec.Options.OnlyTarget {
@@ -97,22 +109,37 @@ func genLuetCommand(foo *v1alpha1.PackageBuild) []string {
 	}
 
 	if foo.Spec.RegistryCredentials.Enabled {
-		args = append([]string{
-			"img",
-			"login",
-			"-u",
-			"$REGISTRY_USERNAME",
-			"-p",
-			"$REGISTRY_PASSWORD",
-			"$REGISTRY_URI",
-			"&&",
-		}, args...)
+		switch foo.Spec.Options.GetBackend() {
+		case ImgBackend:
+			args = append([]string{
+				"img",
+				"login",
+				"-u",
+				"$REGISTRY_USERNAME",
+				"-p",
+				"$REGISTRY_PASSWORD",
+				"$REGISTRY_URI",
+				"&&",
+			}, args...)
+		case DockerBackend:
+			args = append([]string{
+				"docker",
+				"login",
+				"-u",
+				"$REGISTRY_USERNAME",
+				"-p",
+				"$REGISTRY_PASSWORD",
+				"$REGISTRY_URI",
+				"&&",
+			}, args...)
+		}
 	}
 	return []string{strings.Join(args, " ")}
 }
 
 func genCreateRepoCommand(foo *v1alpha1.PackageBuild) []string {
-	args := []string{"luet", "--version", "&&", "luet", "create-repo", "--backend", "img", "--packages", "/build"}
+	args := []string{"luet", "--version", "&&", "luet", "create-repo", "--packages", "/build"}
+	args = append(args, "--backend", foo.Spec.Options.GetBackend())
 
 	if foo.Spec.LuetRepository.Type == "docker" {
 		args = append(args, "--output", foo.Spec.LuetRepository.OutputImage)
@@ -177,23 +204,37 @@ func genCreateRepoCommand(foo *v1alpha1.PackageBuild) []string {
 	}
 
 	if foo.Spec.RegistryCredentials.Enabled {
-		args = append([]string{
-			"img",
-			"login",
-			"-u",
-			"$REGISTRY_USERNAME",
-			"-p",
-			"$REGISTRY_PASSWORD",
-			"$REGISTRY_URI",
-			"&&",
-		}, args...)
+		switch foo.Spec.Options.GetBackend() {
+		case ImgBackend:
+			args = append([]string{
+				"img",
+				"login",
+				"-u",
+				"$REGISTRY_USERNAME",
+				"-p",
+				"$REGISTRY_PASSWORD",
+				"$REGISTRY_URI",
+				"&&",
+			}, args...)
+		case DockerBackend:
+			args = append([]string{
+				"docker",
+				"login",
+				"-u",
+				"$REGISTRY_USERNAME",
+				"-p",
+				"$REGISTRY_PASSWORD",
+				"$REGISTRY_URI",
+				"&&",
+			}, args...)
+		}
 	}
 	return []string{strings.Join(args, " ")}
 }
 
 func genEnvVars(foo *v1alpha1.PackageBuild) []corev1.EnvVar {
 
-	envs := []corev1.EnvVar{}
+	envs := foo.Spec.Options.Env
 
 	addEnvFromSecret := func(name, secretName, secretKey string) {
 		envs = append(envs, corev1.EnvVar{

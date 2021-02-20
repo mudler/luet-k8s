@@ -53,17 +53,29 @@ type BuildOptions struct {
 	Full bool `json:"full"`
 	All  bool `json:"all"`
 
+	Env []corev1.EnvVar `json:"environment"`
+
+	Backend string `json:"backend"`
+
 	Pull       bool     `json:"pull"`
 	OnlyTarget bool     `json:"onlyTarget"`
 	NoDeps     bool     `json:"noDeps"`
 	Tree       []string `json:"tree"`
 	Debug      bool     `json:"debug"`
+	LiveOutput bool     `json:"liveOutput`
 
 	Push            bool                        `json:"push"`
 	ImageRepository string                      `json:"imageRepository"`
 	Compression     string                      `json:"compression"`
 	Privileged      bool                        `json:"privileged"`
 	Resources       corev1.ResourceRequirements `json:"resources"`
+}
+
+func (b BuildOptions) GetBackend() string {
+	if b.Backend == "" {
+		return "img"
+	}
+	return b.Backend
 }
 
 type CreateRepositoryOptions struct {
