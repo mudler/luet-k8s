@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docker-api-master
+  labels:
+    app: docker-api-master
+spec:
+  selector:
+    matchLabels:
+      app: docker-api-master
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: docker-api-master
+      name: docker-api-master   
+    spec:
+      containers:
+        - name: dind
+          image: docker:19.03-dind
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          resources:
+            requests:
+              cpu: 100m
+              memory: 500Mi
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - mountPath: /lib/modules
+              name: modules
+              readOnly: true
+            - mountPath: /sys/fs/cgroup
+              name: cgroup
+            - name: dind-storage
+              mountPath: /var/lib/docker
+      volumes:
+        - name: modules
+          hostPath:
+            path: /lib/modules
+            type: Directory
+        - name: cgroup
+          hostPath:
+            path: /sys/fs/cgroup
+            type: Directory
+        - name: dind-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docker
+spec:
+  selector:
+    app: docker-api-master
+  ports:
+    - protocol: TCP
+      port: 2375
+      targetPort: 2375
