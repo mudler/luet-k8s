@@ -14,7 +14,7 @@ RUN chmod u-s /usr/bin/new[gu]idmap && \
     setcap cap_setuid+eip /usr/bin/newuidmap && \
     setcap cap_setgid+eip /usr/bin/newgidmap 
 RUN useradd -u 1000 -d /luet -ms /bin/bash luet
-RUN luet upgrade && luet install repository/mocaccino-extra-stable && luet install container/img net-fs/minio-client container/docker
+RUN luet upgrade && luet install repository/mocaccino-extra && luet install container/img net-fs/minio-client container/docker
 
 RUN mkdir -p /run/runc  && chmod 777 /run/runc
 
