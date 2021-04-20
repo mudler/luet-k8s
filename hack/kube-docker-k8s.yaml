@@ -18,6 +18,10 @@ spec:
       containers:
         - name: dind
           image: docker:19.03-dind
+#          command:
+#            - dockerd
+#            - '--mtu=1450'
+#            - '--host=tcp://0.0.0.0:2375'
           env:
             - name: DOCKER_TLS_CERTDIR
               value: ""
