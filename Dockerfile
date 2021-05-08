@@ -5,6 +5,7 @@ RUN luet install -y lang/go
 RUN cd /luet-k8s && CGO_ENABLED=0 go build
 
 FROM ubuntu:20.04
+ADD . /luet-k8s
 RUN apt-get update
 ENV LUET_YES=true
 ENV LUET_DEBUG=true
