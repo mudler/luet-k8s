@@ -72,6 +72,9 @@ type BuildOptions struct {
 }
 
 func (b BuildOptions) GetBackend() string {
+	if b.Backend == "docker-sidecar" {
+		return "docker"
+	}
 	if b.Backend == "" {
 		return "img"
 	}

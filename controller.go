@@ -24,7 +24,7 @@ import (
 const controllerAgentName = "luet-controller"
 
 const (
-	// ErrResourceExists is used as part of the Event 'reason' when a Foo fails
+	// ErrResourceExists is used as part of the Event 'reason' when a packageBuild fails
 	// to sync due to a Deployment of the same name already existing.
 	ErrResourceExists = "ErrResourceExists"
 
@@ -33,7 +33,7 @@ const (
 	MessageResourceExists = "Resource %q already exists and is not managed by Luet"
 )
 
-// Handler is the controller implementation for Foo resources
+// Handler is the controller implementation for packageBuild resources
 type Handler struct {
 	pods            v1.PodClient
 	podsCache       v1.PodCache
@@ -82,24 +82,24 @@ func cleanString(s string) string {
 	return s
 }
 
-func UUID(foo *v1alpha1.PackageBuild) string {
-	return fmt.Sprintf("%s", foo.Name)
-	//	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
+func UUID(packageBuild *v1alpha1.PackageBuild) string {
+	return fmt.Sprintf("%s", packageBuild.Name)
+	//	return cleanString(fmt.Sprintf("%s-%s", packageBuild.Spec.PackageName, packageBuild.Spec.Repository))
 }
 
 func PodToUUID(pod *corev1.Pod) string {
 	return strings.ReplaceAll(pod.Name, "packagebuild-", "")
-	//	return cleanString(fmt.Sprintf("%s-%s", foo.Spec.PackageName, foo.Spec.Repository))
+	//	return cleanString(fmt.Sprintf("%s-%s", packageBuild.Spec.PackageName, packageBuild.Spec.Repository))
 }
 
-func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
-	// foo will be nil if key is deleted from cache
-	if foo == nil {
+func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
+	// packageBuild will be nil if key is deleted from cache
+	if packageBuild == nil {
 		return nil, nil
 	}
-	logrus.Infof("Reconciling '%s' ", foo.Name)
+	logrus.Infof("Reconciling '%s' ", packageBuild.Name)
 
-	packageName := foo.Spec.PackageName
+	packageName := packageBuild.Spec.PackageName
 	if packageName == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
@@ -108,7 +108,7 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 		return nil, nil
 	}
 
-	repository := foo.Spec.Repository.Url
+	repository := packageBuild.Spec.Repository.Url
 	if repository == "" {
 		// We choose to absorb the error here as the worker would requeue the
 		// resource otherwise. Instead, the next time the resource is updated
@@ -117,16 +117,16 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 		return nil, nil
 	}
 
-	// Get the deployment with the name specified in Foo.spec
+	// Get the deployment with the name specified in packageBuild.spec
 	// XXX: TODO Change, now pod name === packageName
-	logrus.Infof("Getting pod for '%s' ", foo.Name)
+	logrus.Infof("Getting pod for '%s' ", packageBuild.Name)
 
-	deployment, err := h.podsCache.Get(foo.Namespace, UUID(foo))
+	deployment, err := h.podsCache.Get(packageBuild.Namespace, UUID(packageBuild))
 	// If the resource doesn't exist, we'll create it
 	if errors.IsNotFound(err) {
-		logrus.Infof("Pod not found for '%s' ", foo.Name)
+		logrus.Infof("Pod not found for '%s' ", packageBuild.Name)
 
-		deployment, err = h.pods.Create(newWorkload(foo))
+		deployment, err = h.pods.Create(newWorkload(packageBuild))
 	}
 
 	// If an error occurs during Get/Create, we'll requeue the item so we can
@@ -136,25 +136,25 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 		return nil, err
 	}
 
-	// If the Deployment is not controlled by this Foo resource, we should log
+	// If the Deployment is not controlled by this packageBuild resource, we should log
 	// a warning to the event recorder and ret
-	if !metav1.IsControlledBy(deployment, foo) {
-		msg := fmt.Sprintf(MessageResourceExists, foo.Spec.PackageName)
+	if !metav1.IsControlledBy(deployment, packageBuild) {
+		msg := fmt.Sprintf(MessageResourceExists, packageBuild.Spec.PackageName)
 		logrus.Infof(msg)
 
-		h.recorder.Event(foo, corev1.EventTypeWarning, ErrResourceExists, msg)
+		h.recorder.Event(packageBuild, corev1.EventTypeWarning, ErrResourceExists, msg)
 		// Notice we don't return an error here, this is intentional because an
 		// error means we should retry to reconcile.  In this situation we've done all
 		// we could, which was log an error.
 		return nil, nil
 	}
 
-	// If this number of the replicas on the Foo resource is specified, and the
+	// If this number of the replicas on the packageBuild resource is specified, and the
 	// number does not equal the current desired replicas on the Deployment, we
 	// should update the Deployment resource.
-	// if foo.Spec.Replicas != nil && *foo.Spec.Replicas != *deployment.Spec.Replicas {
-	// 	logrus.Infof("Foo %s replicas: %d, deployment replicas: %d", foo.Name, *foo.Spec.Replicas, *deployment.Spec.Replicas)
-	// 	deployment, err = h.deployments.Update(newDeployment(foo))
+	// if packageBuild.Spec.Replicas != nil && *packageBuild.Spec.Replicas != *deployment.Spec.Replicas {
+	// 	logrus.Infof("packageBuild %s replicas: %d, deployment replicas: %d", packageBuild.Name, *packageBuild.Spec.Replicas, *deployment.Spec.Replicas)
+	// 	deployment, err = h.deployments.Update(newDeployment(packageBuild))
 	// }
 
 	// If an error occurs during Update, we'll requeue the item so we can
@@ -164,9 +164,9 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	// 	return nil, err
 	// }
 
-	// Finally, we update the status block of the Foo resource to reflect the
+	// Finally, we update the status block of the packageBuild resource to reflect the
 	// current state of the world
-	err = h.updateStatus(foo, deployment)
+	err = h.updateStatus(packageBuild, deployment)
 	if err != nil {
 		return nil, err
 	}
@@ -174,19 +174,27 @@ func (h *Handler) OnPackageBuildChanged(key string, foo *v1alpha1.PackageBuild) 
 	return nil, nil
 }
 
-func (h *Handler) updateStatus(foo *v1alpha1.PackageBuild, pod *corev1.Pod) error {
+func (h *Handler) updateStatus(packageBuild *v1alpha1.PackageBuild, pod *corev1.Pod) error {
 
 	// NEVER modify objects from the store. It's a read-only, local cache.
 	// You can use DeepCopy() to make a deep copy of original object and modify this copy
 	// Or create a copy manually for better performance
-	fooCopy := foo.DeepCopy()
-	fooCopy.Status.State = string(pod.Status.Phase)
-	logrus.Infof("PackageBuild '%s' has status '%s'", foo.Name, fooCopy.Status.State)
+	packageBuildCopy := packageBuild.DeepCopy()
+
+	packageBuildCopy.Status.State = string(pod.Status.Phase)
+
+	for _, c := range append(pod.Status.ContainerStatuses, pod.Status.InitContainerStatuses...) {
+		if c.State.Terminated != nil && c.State.Terminated.ExitCode != 0 {
+			packageBuildCopy.Status.State = "Failed"
+		}
+	}
+
+	logrus.Infof("PackageBuild '%s' has status '%s'", packageBuild.Name, packageBuildCopy.Status.State)
 	// If the CustomResourceSubresources feature gate is not enabled,
-	// we must use Update instead of UpdateStatus to update the Status block of the Foo resource.
+	// we must use Update instead of UpdateStatus to update the Status block of the packageBuild resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
-	_, err := h.controller.UpdateStatus(fooCopy)
+	_, err := h.controller.UpdateStatus(packageBuildCopy)
 	return err
 }
 
@@ -198,7 +206,7 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 	logrus.Infof("Pod '%s' has changed", pod.Name)
 
 	if ownerRef := metav1.GetControllerOf(pod); ownerRef != nil {
-		// If this object is not owned by a Foo, we should not do anything more
+		// If this object is not owned by a packageBuild, we should not do anything more
 		// with it.
 		if ownerRef.Kind != "PackageBuild" {
 			logrus.Infof("Pod '%s' not owned by PackageBuild", pod.Name)
@@ -206,14 +214,14 @@ func (h *Handler) OnPodChanged(key string, pod *corev1.Pod) (*corev1.Pod, error)
 			return nil, nil
 		}
 
-		foo, err := h.podsCache.Get(pod.Namespace, pod.Name)
+		packageBuild, err := h.podsCache.Get(pod.Namespace, pod.Name)
 		if err != nil {
 			logrus.Infof("ignoring orphaned object '%s' of PackageBuild '%s'", pod.GetSelfLink(), ownerRef.Name)
 			return nil, nil
 		}
 		logrus.Infof("Enqueueing reconcile for %s", pod.Name)
 
-		h.controller.Enqueue(foo.Namespace, foo.Name)
+		h.controller.Enqueue(packageBuild.Namespace, packageBuild.Name)
 		return nil, nil
 	}
 
