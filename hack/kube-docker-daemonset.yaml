@@ -61,3 +61,5 @@ spec:
     - protocol: TCP
       port: 2375
       targetPort: 2375
+  topologyKeys:
+    - "kubernetes.io/hostname"
