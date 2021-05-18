@@ -124,6 +124,8 @@ type BuildSpec struct {
 	Annotations         map[string]string       `json:"annotations"`
 	Labels              map[string]string       `json:"labels"`
 	LuetRepository      CreateRepositoryOptions `json:"luetRepository"`
+
+	PodScheduler string `json:"podScheduler"`
 }
 
 type BuildStatus struct {

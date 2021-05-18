@@ -467,6 +467,10 @@ func newWorkload(packageBuild *v1alpha1.PackageBuild) *corev1.Pod {
 		},
 	}
 
+	if packageBuild.Spec.PodScheduler != "" {
+		workloadPod.Spec.SchedulerName = packageBuild.Spec.PodScheduler
+	}
+
 	workloadPod.Spec.InitContainers = []corev1.Container{
 		cloneContainer,
 	}
