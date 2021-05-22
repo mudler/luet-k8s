@@ -45,8 +45,9 @@ type Storage struct {
 }
 
 type BuildOptions struct {
-	Color   bool `json:"color"`
-	Spinner bool `json:"spinner"`
+	Color   bool     `json:"color"`
+	Spinner bool     `json:"spinner"`
+	Values  []string `json:"values"`
 
 	Emoji bool `json:"emoji"`
 

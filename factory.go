@@ -89,6 +89,10 @@ func genLuetCommand(packageBuild *v1alpha1.PackageBuild) []string {
 		args = append(args, "--all")
 	}
 
+	for _, v := range packageBuild.Spec.Options.Values {
+		args = append(args, fmt.Sprintf("--values=/repository%s", v))
+	}
+
 	args = append(args, fmt.Sprintf("--emoji=%t", packageBuild.Spec.Options.Emoji))
 	args = append(args, fmt.Sprintf("--color=%t", packageBuild.Spec.Options.Color))
 	args = append(args, fmt.Sprintf("--no-spinner=%t", !packageBuild.Spec.Options.Spinner))
