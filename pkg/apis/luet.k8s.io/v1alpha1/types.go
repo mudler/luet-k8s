@@ -54,6 +54,8 @@ type BuildOptions struct {
 	Full bool `json:"full"`
 	All  bool `json:"all"`
 
+	Retry int `json:"retry"`
+
 	Env []corev1.EnvVar `json:"environment"`
 
 	Backend string `json:"backend"`
@@ -131,4 +133,6 @@ type BuildSpec struct {
 
 type BuildStatus struct {
 	State string `json:"state"`
+	Retry int    `json:"retry"`
+	Node  string `json:"node"`
 }

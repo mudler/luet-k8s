@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
@@ -22,6 +23,7 @@ import (
 )
 
 const controllerAgentName = "luet-controller"
+const retryAnnotation = "luet-k8s.io/retry"
 
 const (
 	// ErrResourceExists is used as part of the Event 'reason' when a packageBuild fails
@@ -189,7 +191,20 @@ func (h *Handler) updateStatus(packageBuild *v1alpha1.PackageBuild, pod *corev1.
 		}
 	}
 
+	packageBuildCopy.Status.Node = pod.Spec.NodeName
 	logrus.Infof("PackageBuild '%s' has status '%s'", packageBuild.Name, packageBuildCopy.Status.State)
+
+	if ann, exists := packageBuild.Annotations[retryAnnotation]; exists && ann != "0" {
+		if nretrials, err := strconv.Atoi(ann); err == nil {
+			if packageBuildCopy.Status.State == "Failed" && packageBuild.Status.Retry < nretrials {
+				packageBuildCopy.Status.Retry++
+				if err := h.pods.Delete(pod.Namespace, pod.Name, &metav1.DeleteOptions{}); err != nil {
+					logrus.Infof("Failed deleting '%s'", pod.Name)
+				}
+			}
+		}
+	}
+
 	// If the CustomResourceSubresources feature gate is not enabled,
 	// we must use Update instead of UpdateStatus to update the Status block of the packageBuild resource.
 	// UpdateStatus will not allow changes to the Spec of the resource,
