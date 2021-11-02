@@ -17,7 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	luetTypes "github.com/mudler/luet/pkg/api/core/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -143,9 +142,15 @@ type BuildSpec struct {
 }
 
 type RepoBuildSpec struct {
-	Packages      []string                 `json:"packages"`
-	Repository    luetTypes.LuetRepository `json:"repository"`
-	GitRepository Repository               `json:"git_repository"`
+	Packages      []string       `json:"packages"`
+	Repository    LuetRepository `json:"repository"`
+	GitRepository Repository     `json:"git_repository"`
+}
+type LuetRepository struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Urls        []string `json:"urls"`
+	Type        string   `json:"type"`
 }
 
 type BuildStatus struct {
