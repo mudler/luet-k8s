@@ -55,6 +55,8 @@ func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource
 	// Group=luet.k8s.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("packagebuilds"):
 		return &genericInformer{resource: resource.GroupResource(), informer: f.Luet().V1alpha1().PackageBuilds().Informer()}, nil
+	case v1alpha1.SchemeGroupVersion.WithResource("repobuilds"):
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Luet().V1alpha1().RepoBuilds().Informer()}, nil
 
 	}
 

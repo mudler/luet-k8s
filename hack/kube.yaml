@@ -12,6 +12,20 @@ spec:
   subresources:
     status: {}
 ---
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: repobuilds.luet.k8s.io
+spec:
+  group: luet.k8s.io
+  version: v1alpha1
+  names:
+    kind: RepoBuild
+    plural: repobuilds
+  scope: Namespaced
+  subresources:
+    status: {}
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -32,6 +46,7 @@ rules:
   - luet.k8s.io
   resources:
   - packagebuilds/status
+  - repobuilds/status
   verbs:
   - create
   - delete
@@ -41,6 +56,7 @@ rules:
   - luet.k8s.io
   resources:
   - packagebuilds
+  - repobuilds
   verbs:
   - create
   - delete

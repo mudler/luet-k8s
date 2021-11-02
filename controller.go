@@ -2,17 +2,31 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	helpers "github.com/mudler/luet/cmd/helpers"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
 	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
 	v1 "github.com/mudler/luet-k8s/pkg/generated/controllers/core/v1"
 	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io/v1alpha1"
-
+	"github.com/mudler/luet/pkg/api/client"
+	"github.com/mudler/luet/pkg/api/core/types"
+	"github.com/mudler/luet/pkg/compiler"
+	compilerspec "github.com/mudler/luet/pkg/compiler/types/spec"
+	installer "github.com/mudler/luet/pkg/installer"
+	pkg "github.com/mudler/luet/pkg/package"
+	"github.com/mudler/luet/pkg/tree"
 	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +55,8 @@ type Handler struct {
 	podsCache       v1.PodCache
 	controller      v1alpha1controller.PackageBuildController
 	controllerCache v1alpha1controller.PackageBuildCache
+	repoBuild       v1alpha1controller.RepoBuildController
+	repoBuildCache  v1alpha1controller.RepoBuildCache
 	recorder        record.EventRecorder
 }
 
@@ -49,7 +65,8 @@ func Register(
 	ctx context.Context,
 	events typedcorev1.EventInterface,
 	pods v1.PodController,
-	packageBuild v1alpha1controller.PackageBuildController) {
+	packageBuild v1alpha1controller.PackageBuildController,
+	repoBuild v1alpha1controller.RepoBuildController) {
 
 	controller := &Handler{
 		pods:            pods,
@@ -57,11 +74,14 @@ func Register(
 		controller:      packageBuild,
 		controllerCache: packageBuild.Cache(),
 		recorder:        buildEventRecorder(events),
+		repoBuild:       repoBuild,
+		repoBuildCache:  repoBuild.Cache(),
 	}
 
 	// Register handlers
 	pods.OnChange(ctx, "luet-handler", controller.OnPodChanged)
 	packageBuild.OnChange(ctx, "luet-handler", controller.OnPackageBuildChanged)
+	repoBuild.OnChange(ctx, "luet-handler", controller.OnRepoBuildChanged)
 }
 
 func buildEventRecorder(events typedcorev1.EventInterface) record.EventRecorder {
@@ -94,6 +114,330 @@ func PodToUUID(pod *corev1.Pod) string {
 	//	return cleanString(fmt.Sprintf("%s-%s", packageBuild.Spec.PackageName, packageBuild.Spec.Repository))
 }
 
+func (h *Handler) getRepo(url, t string) (*installer.LuetSystemRepository, error) {
+	fmt.Println("Retrieving remote repository packages")
+	tmpdir, err := ioutil.TempDir(os.TempDir(), "ci")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpdir)
+
+	ctx := types.NewContext()
+	ctx.Config.GetSystem().Rootfs = tmpdir
+	ctx.Config.GetSystem().TmpDirBase = tmpdir
+	d := installer.NewSystemRepository(types.LuetRepository{
+		Name:   "stub",
+		Type:   t,
+		Cached: true,
+		Urls:   []string{url},
+	})
+	return d.Sync(ctx, false)
+}
+
+func contains(search *client.SearchResult, packagename string) (string, bool) {
+
+	for _, p := range search.Packages {
+		if p.Category+"/"+p.Name == packagename {
+			return fmt.Sprintf("%s/%s@%s", p.Category, p.Name, p.Version), true
+		}
+	}
+
+	return "", false
+
+}
+
+func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) (*v1alpha1.RepoBuild, error) {
+	// packageBuild will be nil if key is deleted from cache
+	if repoBuild == nil {
+		return nil, nil
+	}
+	logrus.Infof("Reconciling '%s' ", repoBuild.Name)
+
+	repoType := repoBuild.Spec.Repository.Type
+	if repoType == "" {
+		// We choose to absorb the error here as the worker would requeue the
+		// resource otherwise. Instead, the next time the resource is updated
+		// the resource will be queued again.
+		utilruntime.HandleError(fmt.Errorf("%s: package name must be specified", key))
+		return nil, nil
+	}
+
+	urls := repoBuild.Spec.Repository.Urls
+	if len(urls) == 0 {
+		// We choose to absorb the error here as the worker would requeue the
+		// resource otherwise. Instead, the next time the resource is updated
+		// the resource will be queued again.
+		utilruntime.HandleError(fmt.Errorf("%s: repository url must be specified", key))
+		return nil, nil
+	}
+
+	// We need to download the repo and get the list of packages that we want to build
+	if len(repoBuild.Spec.Packages) == 0 {
+		logrus.Infof("Generating packages to build")
+
+		n, err := ioutil.TempDir("", "")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(n)
+		// Generate package list, update ourselves with the list and enqueue
+		repo, err := h.getRepo(urls[0], repoType)
+		if err != nil {
+			return nil, fmt.Errorf("error getting repo: %s", err.Error())
+		}
+
+		opts := &git.CloneOptions{
+			URL: repoBuild.Spec.GitRepository.Url,
+		}
+		// repo.BuildTree
+
+		r, err := git.PlainClone(n, false, opts)
+		if err != nil {
+			return nil, fmt.Errorf("error cloning git repo: %s", err.Error())
+		}
+
+		w, err := r.Worktree()
+		if err != nil {
+			return nil, fmt.Errorf("error cloning git repo: %s", err.Error())
+		}
+
+		err = w.Checkout(&git.CheckoutOptions{
+			Hash: plumbing.NewHash(repoBuild.Spec.GitRepository.Checkout),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error chgeckout git repo: %s", err.Error())
+		}
+		gitRepoPackages, err := client.TreePackages(filepath.Join(n, repoBuild.Spec.Options.Tree[0]))
+		if err != nil {
+			return nil, fmt.Errorf("error getting packages tree: %s", err.Error())
+		}
+
+		list := &client.SearchResult{}
+		logrus.Infof("Fetched", repo)
+		for _, p := range repo.GetTree().GetDatabase().World() {
+			list.Packages = append(list.Packages, client.Package{
+				Name:     p.GetName(),
+				Category: p.GetCategory(),
+				Version:  p.GetVersion(),
+			})
+		}
+		missingPackages := []string{}
+
+		for _, p := range gitRepoPackages.Packages {
+			if !client.Packages(list.Packages).Exist(p) {
+				missingPackages = append(missingPackages, p.String())
+			}
+		}
+
+		logrus.Infof("Found missing packages", missingPackages)
+
+		repobuildCopy := repoBuild.DeepCopy()
+		repobuildCopy.Spec.Packages = missingPackages
+		logrus.Infof("Updating status with", missingPackages)
+
+		_, err = h.repoBuild.Update(repobuildCopy)
+		if err != nil {
+			return nil, err
+		}
+
+		logrus.Infof("Packages to build", missingPackages)
+		logrus.Infof("Re-enqueue")
+
+		// Re-enqueue ourselves with the list added
+		h.repoBuild.Enqueue(repoBuild.Namespace, repoBuild.Name)
+
+		return nil, nil
+	}
+
+	// We have the list of packages that we want to build
+	opts := &git.CloneOptions{
+		URL: repoBuild.Spec.GitRepository.Url,
+	}
+
+	missing := &client.SearchResult{}
+
+	n, err := ioutil.TempDir("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(n)
+	// repo.BuildTree
+	db := pkg.NewInMemoryDatabase(false)
+	generalRecipe := tree.NewCompilerRecipe(db)
+
+	r, err := git.PlainClone(n, false, opts)
+	if err != nil {
+		return nil, err
+	}
+	w, err := r.Worktree()
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = w.Checkout(&git.CheckoutOptions{
+		Hash: plumbing.NewHash(repoBuild.Spec.GitRepository.Checkout),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error chgeckout git repo: %s", err.Error())
+	}
+
+	logrus.Infof("Loading compilation specs")
+
+	err = generalRecipe.Load(filepath.Join(n, repoBuild.Spec.Options.Tree[0]))
+	if err != nil {
+		return nil, err
+	}
+
+	compilerSpecs := compilerspec.NewLuetCompilationspecs()
+	// TODO Fill from []packages
+
+	luetCompiler := compiler.NewLuetCompiler(nil, generalRecipe.GetDatabase())
+
+	for _, a := range repoBuild.Spec.Packages {
+		pack, err := helpers.ParsePackageStr(a)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, nil
+		}
+
+		spec, err := luetCompiler.FromPackage(pack)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, nil
+		}
+		missing.Packages = append(missing.Packages, client.Package{
+			Name:     pack.GetName(),
+			Category: pack.GetCategory(),
+			Version:  pack.GetVersion(),
+		})
+		compilerSpecs.Add(spec)
+	}
+
+	type buildjob struct {
+		Jobs []string `json:"packages"`
+	}
+	bt := []buildjob{}
+
+	if repoBuild.Status.BuildTree == "" {
+		logrus.Infof("Generating buildtree")
+		// As this is an expensive operation and we are called to re-use this data, store it
+		// in the PackageBuild status
+
+		saved := []buildjob{}
+		bt, err := luetCompiler.BuildTree(*compilerSpecs)
+		if err != nil {
+			return nil, err
+		}
+
+		toCreate := []*v1alpha1.PackageBuild{}
+
+		for _, l := range bt.AllLevels() {
+			// TODO: Walk level, and link l to l-1  (waitFor)
+			// and generate package build specs. Set the owner to the RepoBuild
+			// Include ONLY the ones that are contained in missingPackages.
+
+			// TODO: Do not create IF the packagebuild spec is there already
+			bj := buildjob{}
+
+			if l == 0 {
+				//	newPackageBuild() //No wait
+				for _, p := range bt.AllInLevel(l) {
+					full, ok := contains(missing, p)
+					bj.Jobs = append(bj.Jobs, full)
+					if ok {
+
+						toCreate = append(toCreate, newPackageBuild(full, []string{}, repoBuild))
+
+					}
+				}
+			} else {
+				wait := bt.AllInLevel(l - 1) // TODO There is no PV at this stage
+				waitFor := []string{}
+				for _, p := range wait {
+					full, ok := contains(missing, p)
+
+					if ok {
+						waitFor = append(waitFor, sanitizeName(full))
+					}
+				}
+
+				for _, p := range bt.AllInLevel(l) {
+					full, ok := contains(missing, p)
+					bj.Jobs = append(bj.Jobs, full)
+
+					if ok {
+
+						toCreate = append(toCreate, newPackageBuild(full, waitFor, repoBuild))
+
+					}
+				}
+			}
+			saved = append(saved, bj)
+
+		}
+		copy := repoBuild.DeepCopy()
+		dat, _ := json.Marshal(saved)
+
+		copy.Status.BuildTree = base64.RawURLEncoding.EncodeToString(dat)
+		h.repoBuild.UpdateStatus(copy)
+
+		for _, t := range toCreate {
+			_, err := h.controllerCache.Get(t.Namespace, t.Name)
+			if errors.IsNotFound(err) {
+				h.controller.Create(t)
+				continue
+			}
+		}
+	} else {
+		b, err := base64.RawURLEncoding.DecodeString(repoBuild.Status.BuildTree)
+		if err != nil {
+			return nil, err
+		}
+		json.Unmarshal(b, &bt)
+	}
+
+	total, success, running, fails := 0, 0, 0, 0
+
+	// Cycle over toCreate, check if it's not already there, and create!
+	for _, t := range bt {
+		for _, j := range t.Jobs {
+			if j == "" {
+				continue
+			}
+
+			packageBuild, err := h.controllerCache.Get(repoBuild.Namespace, sanitizeName(j))
+			if errors.IsNotFound(err) {
+				logrus.Info("Packagebuild", j, "not found")
+				continue
+			}
+			total++
+			switch packageBuild.Status.State {
+			case "Succeeded":
+				success++
+			case "Failed":
+				fails++
+			case "Pending", "Running":
+				running++
+			}
+		}
+	}
+
+	stateBuild := repoBuild.DeepCopy()
+	switch {
+	case fails > 0:
+		stateBuild.Status.State = "Failed"
+	case running > 0:
+		stateBuild.Status.State = "Running"
+	case success == total:
+		stateBuild.Status.State = "Succeeded"
+	}
+
+	_, err = h.repoBuild.UpdateStatus(stateBuild)
+
+	return nil, err
+}
+
 func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {
 	// packageBuild will be nil if key is deleted from cache
 	if packageBuild == nil {
@@ -121,7 +465,7 @@ func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.Packa
 
 	// Get the deployment with the name specified in packageBuild.spec
 	// XXX: TODO Change, now pod name === packageName
-	logrus.Infof("Getting pod for '%s' ", packageBuild.Name)
+	logrus.Infof("Getting Packagebuild for '%s' ", packageBuild.Name)
 
 	deployment, err := h.podsCache.Get(packageBuild.Namespace, UUID(packageBuild))
 	// If the resource doesn't exist, we'll create it
@@ -142,6 +486,11 @@ func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.Packa
 				logrus.Infof("parent '%s' not ready ", parent)
 				return nil, err
 			}
+		}
+
+		// Check if we didn't already run successfully
+		if packageBuild.Status.State == "Succeeded" {
+			logrus.Infof("Packagebuild already processed for pod with Succeeded state. Not rescheduling ", packageBuild.Name)
 		}
 
 		deployment, err = h.pods.Create(newWorkload(packageBuild))
@@ -189,6 +538,10 @@ func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.Packa
 		return nil, err
 	}
 
+	for _, own := range packageBuild.OwnerReferences {
+		h.repoBuild.Enqueue(packageBuild.Namespace, own.Name)
+	}
+
 	return nil, nil
 }
 
@@ -226,6 +579,20 @@ func (h *Handler) updateStatus(packageBuild *v1alpha1.PackageBuild, pod *corev1.
 	// UpdateStatus will not allow changes to the Spec of the resource,
 	// which is ideal for ensuring nothing other than resource status has been updated.
 	_, err := h.controller.UpdateStatus(packageBuildCopy)
+	if err != nil {
+		return err
+	}
+	list, err := h.controller.List(packageBuildCopy.Namespace, metav1.ListOptions{})
+	for _, pb := range list.Items {
+		for _, wait := range pb.Spec.WaitFor {
+			if wait == packageBuildCopy.Name {
+				logrus.Infof("Enqueue reconcile for %s/%s", pb.Namespace, pb.Name)
+
+				h.controller.Enqueue(pb.Namespace, pb.Name)
+			}
+		}
+	}
+
 	return err
 }
 

@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +31,18 @@ type PackageBuild struct {
 
 	Spec   BuildSpec   `json:"spec"`
 	Status BuildStatus `json:"status"`
+}
+
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// RepoBuild is a specification for a RepoBuild resource
+type RepoBuild struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   RepoBuildSpec   `json:"spec"`
+	Status RepoBuildStatus `json:"status"`
 }
 
 type Storage struct {
@@ -133,8 +144,37 @@ type BuildSpec struct {
 	PodScheduler string `json:"podScheduler"`
 }
 
+type RepoBuildSpec struct {
+	Packages      []string       `json:"packages"`
+	Repository    LuetRepository `json:"repository"`
+	GitRepository Repository     `json:"git_repository"`
+
+	// Those belows will populate packagebuilds generated
+	Storage             Storage                 `json:"storage"`
+	Options             BuildOptions            `json:"options"`
+	RegistryCredentials RegistryCredentials     `json:"registry"`
+	NodeSelector        map[string]string       `json:"nodeSelector"`
+	Annotations         map[string]string       `json:"annotations"`
+	Labels              map[string]string       `json:"labels"`
+	LuetRepository      CreateRepositoryOptions `json:"luetRepository"`
+
+	PodScheduler string `json:"podScheduler"`
+}
+
+type LuetRepository struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Urls        []string `json:"urls"`
+	Type        string   `json:"type"`
+}
+
 type BuildStatus struct {
 	State string `json:"state"`
 	Retry int    `json:"retry"`
 	Node  string `json:"node"`
+}
+
+type RepoBuildStatus struct {
+	State     string `json:"state"`
+	BuildTree string `json:"buildtree"`
 }

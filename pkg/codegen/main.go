@@ -15,8 +15,12 @@ func main() {
 			"luet.k8s.io": {
 				Types: []interface{}{
 					v1alpha1.PackageBuild{},
+					v1alpha1.RepoBuild{},
 				},
-				GenerateTypes: true,
+				GenerateTypes:     true,
+				GenerateClients:   true,
+				GenerateListers:   true,
+				GenerateInformers: true,
 			},
 			// Optionally you can use wrangler-api project which
 			// has a lot of common kubernetes APIs already generated.

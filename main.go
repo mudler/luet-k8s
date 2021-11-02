@@ -56,7 +56,8 @@ func main() {
 	Register(ctx,
 		kubeClient.CoreV1().Events(""),
 		podsfactory.Core().V1().Pod(),
-		sample.Luet().V1alpha1().PackageBuild())
+		sample.Luet().V1alpha1().PackageBuild(),
+		sample.Luet().V1alpha1().RepoBuild())
 
 	// Start all the controllers
 	if err := start.All(ctx, 2, podsfactory, sample); err != nil {

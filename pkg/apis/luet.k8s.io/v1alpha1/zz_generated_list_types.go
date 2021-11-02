@@ -40,3 +40,20 @@ func NewPackageBuild(namespace, name string, obj PackageBuild) *PackageBuild {
 	obj.Namespace = namespace
 	return &obj
 }
+
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+
+// RepoBuildList is a list of RepoBuild resources
+type RepoBuildList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata"`
+
+	Items []RepoBuild `json:"items"`
+}
+
+func NewRepoBuild(namespace, name string, obj RepoBuild) *RepoBuild {
+	obj.APIVersion, obj.Kind = SchemeGroupVersion.WithKind("RepoBuild").ToAPIVersionAndKind()
+	obj.Name = name
+	obj.Namespace = namespace
+	return &obj
+}

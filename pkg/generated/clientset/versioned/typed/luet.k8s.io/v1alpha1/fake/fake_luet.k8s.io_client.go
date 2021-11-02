@@ -32,6 +32,10 @@ func (c *FakeLuetV1alpha1) PackageBuilds(namespace string) v1alpha1.PackageBuild
 	return &FakePackageBuilds{c, namespace}
 }
 
+func (c *FakeLuetV1alpha1) RepoBuilds(namespace string) v1alpha1.RepoBuildInterface {
+	return &FakeRepoBuilds{c, namespace}
+}
+
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
 func (c *FakeLuetV1alpha1) RESTClient() rest.Interface {
