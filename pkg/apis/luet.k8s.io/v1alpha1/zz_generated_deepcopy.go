@@ -93,6 +93,11 @@ func (in *BuildSpec) DeepCopyInto(out *BuildSpec) {
 		}
 	}
 	in.LuetRepository.DeepCopyInto(&out.LuetRepository)
+	if in.WaitFor != nil {
+		in, out := &in.WaitFor, &out.WaitFor
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 

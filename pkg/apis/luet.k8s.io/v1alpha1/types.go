@@ -128,6 +128,8 @@ type BuildSpec struct {
 	Labels              map[string]string       `json:"labels"`
 	LuetRepository      CreateRepositoryOptions `json:"luetRepository"`
 
+	WaitFor []string `json:"waitFor"`
+
 	PodScheduler string `json:"podScheduler"`
 }
 

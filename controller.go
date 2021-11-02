@@ -128,6 +128,22 @@ func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.Packa
 	if errors.IsNotFound(err) {
 		logrus.Infof("Pod not found for '%s' ", packageBuild.Name)
 
+		// Wait for dependant package builds
+		for _, parent := range packageBuild.Spec.WaitFor {
+
+			b, err := h.controllerCache.Get(packageBuild.Namespace, parent)
+			if err != nil {
+				logrus.Infof("WaitFor not found '%s' ", parent)
+
+				return nil, err
+			}
+
+			if b.Status.State != "Succeeded" {
+				logrus.Infof("parent '%s' not ready ", parent)
+				return nil, err
+			}
+		}
+
 		deployment, err = h.pods.Create(newWorkload(packageBuild))
 	}
 
