@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
+	luetTypes "github.com/mudler/luet/pkg/api/core/types"
 	corev1 "k8s.io/api/core/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -32,6 +32,15 @@ type PackageBuild struct {
 
 	Spec   BuildSpec   `json:"spec"`
 	Status BuildStatus `json:"status"`
+}
+
+// RepoBuild is a specification for a RepoBuild resource
+type RepoBuild struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   RepoBuildSpec   `json:"spec"`
+	Status RepoBuildStatus `json:"status"`
 }
 
 type Storage struct {
@@ -133,8 +142,18 @@ type BuildSpec struct {
 	PodScheduler string `json:"podScheduler"`
 }
 
+type RepoBuildSpec struct {
+	Packages      []string                 `json:"packages"`
+	Repository    luetTypes.LuetRepository `json:"repository"`
+	GitRepository Repository               `json:"git_repository"`
+}
+
 type BuildStatus struct {
 	State string `json:"state"`
 	Retry int    `json:"retry"`
 	Node  string `json:"node"`
+}
+
+type RepoBuildStatus struct {
+	State string `json:"state"`
 }
