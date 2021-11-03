@@ -317,6 +317,7 @@ func (in *RepoBuildSpec) DeepCopyInto(out *RepoBuildSpec) {
 	}
 	in.Repository.DeepCopyInto(&out.Repository)
 	out.GitRepository = in.GitRepository
+	out.Storage = in.Storage
 	in.Options.DeepCopyInto(&out.Options)
 	out.RegistryCredentials = in.RegistryCredentials
 	if in.NodeSelector != nil {

@@ -175,5 +175,6 @@ type BuildStatus struct {
 }
 
 type RepoBuildStatus struct {
-	State string `json:"state"`
+	State     string `json:"state"`
+	BuildTree string `json:"buildtree"`
 }

@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"strings"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
 
@@ -10,6 +11,7 @@ import (
 )
 
 func sanitizeName(s string) string {
+	s = strings.ToLower(s)
 	reg, _ := regexp.Compile("[^a-zA-Z0-9]+")
 	processedString := reg.ReplaceAllString(s, "")
 	return processedString
