@@ -31,6 +31,7 @@ func init() {
 
 type Interface interface {
 	PackageBuild() PackageBuildController
+	RepoBuild() RepoBuildController
 }
 
 func New(controllerFactory controller.SharedControllerFactory) Interface {
@@ -45,4 +46,7 @@ type version struct {
 
 func (c *version) PackageBuild() PackageBuildController {
 	return NewPackageBuildController(schema.GroupVersionKind{Group: "luet.k8s.io", Version: "v1alpha1", Kind: "PackageBuild"}, "packagebuilds", true, c.controllerFactory)
+}
+func (c *version) RepoBuild() RepoBuildController {
+	return NewRepoBuildController(schema.GroupVersionKind{Group: "luet.k8s.io", Version: "v1alpha1", Kind: "RepoBuild"}, "repobuilds", true, c.controllerFactory)
 }

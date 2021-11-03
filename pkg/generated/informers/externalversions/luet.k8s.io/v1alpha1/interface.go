@@ -26,6 +26,8 @@ import (
 type Interface interface {
 	// PackageBuilds returns a PackageBuildInformer.
 	PackageBuilds() PackageBuildInformer
+	// RepoBuilds returns a RepoBuildInformer.
+	RepoBuilds() RepoBuildInformer
 }
 
 type version struct {
@@ -42,4 +44,9 @@ func New(f internalinterfaces.SharedInformerFactory, namespace string, tweakList
 // PackageBuilds returns a PackageBuildInformer.
 func (v *version) PackageBuilds() PackageBuildInformer {
 	return &packageBuildInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
+}
+
+// RepoBuilds returns a RepoBuildInformer.
+func (v *version) RepoBuilds() RepoBuildInformer {
+	return &repoBuildInformer{factory: v.factory, namespace: v.namespace, tweakListOptions: v.tweakListOptions}
 }

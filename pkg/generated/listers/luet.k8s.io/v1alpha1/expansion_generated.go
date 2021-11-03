@@ -25,3 +25,11 @@ type PackageBuildListerExpansion interface{}
 // PackageBuildNamespaceListerExpansion allows custom methods to be added to
 // PackageBuildNamespaceLister.
 type PackageBuildNamespaceListerExpansion interface{}
+
+// RepoBuildListerExpansion allows custom methods to be added to
+// RepoBuildLister.
+type RepoBuildListerExpansion interface{}
+
+// RepoBuildNamespaceListerExpansion allows custom methods to be added to
+// RepoBuildNamespaceLister.
+type RepoBuildNamespaceListerExpansion interface{}

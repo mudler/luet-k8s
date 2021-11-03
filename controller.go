@@ -3,16 +3,28 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+
+	git "github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
+	helpers "github.com/mudler/luet/cmd/helpers"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
 	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
 	v1 "github.com/mudler/luet-k8s/pkg/generated/controllers/core/v1"
 	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io/v1alpha1"
-
+	"github.com/mudler/luet/pkg/api/client"
+	"github.com/mudler/luet/pkg/api/core/types"
+	"github.com/mudler/luet/pkg/compiler"
+	compilerspec "github.com/mudler/luet/pkg/compiler/types/spec"
+	installer "github.com/mudler/luet/pkg/installer"
+	pkg "github.com/mudler/luet/pkg/package"
+	"github.com/mudler/luet/pkg/tree"
 	"github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -41,6 +53,8 @@ type Handler struct {
 	podsCache       v1.PodCache
 	controller      v1alpha1controller.PackageBuildController
 	controllerCache v1alpha1controller.PackageBuildCache
+	repoBuild       v1alpha1controller.RepoBuildController
+	repoBuildCache  v1alpha1controller.RepoBuildCache
 	recorder        record.EventRecorder
 }
 
@@ -49,7 +63,8 @@ func Register(
 	ctx context.Context,
 	events typedcorev1.EventInterface,
 	pods v1.PodController,
-	packageBuild v1alpha1controller.PackageBuildController) {
+	packageBuild v1alpha1controller.PackageBuildController,
+	repoBuild v1alpha1controller.RepoBuildController) {
 
 	controller := &Handler{
 		pods:            pods,
@@ -57,11 +72,14 @@ func Register(
 		controller:      packageBuild,
 		controllerCache: packageBuild.Cache(),
 		recorder:        buildEventRecorder(events),
+		repoBuild:       repoBuild,
+		repoBuildCache:  repoBuild.Cache(),
 	}
 
 	// Register handlers
 	pods.OnChange(ctx, "luet-handler", controller.OnPodChanged)
 	packageBuild.OnChange(ctx, "luet-handler", controller.OnPackageBuildChanged)
+	repoBuild.OnChange(ctx, "luet-handler", controller.OnRepoBuildChanged)
 }
 
 func buildEventRecorder(events typedcorev1.EventInterface) record.EventRecorder {
@@ -92,6 +110,228 @@ func UUID(packageBuild *v1alpha1.PackageBuild) string {
 func PodToUUID(pod *corev1.Pod) string {
 	return strings.ReplaceAll(pod.Name, "packagebuild-", "")
 	//	return cleanString(fmt.Sprintf("%s-%s", packageBuild.Spec.PackageName, packageBuild.Spec.Repository))
+}
+
+func (h *Handler) getRepo(url, t string) (*installer.LuetSystemRepository, error) {
+	fmt.Println("Retrieving remote repository packages")
+	tmpdir, err := ioutil.TempDir(os.TempDir(), "ci")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpdir)
+
+	d := installer.NewSystemRepository(types.LuetRepository{
+		Name:   "stub",
+		Type:   t,
+		Cached: true,
+		Urls:   []string{url},
+	})
+	return d.Sync(types.NewContext(), false)
+}
+
+func contains(search *client.SearchResult, packagename string) (string, bool) {
+
+	for _, p := range search.Packages {
+		if p.Category+"/"+p.Name == packagename {
+			return fmt.Sprintf("%s/%s@%s", p.Category, p.Name, p.Version), true
+		}
+	}
+
+	return "", false
+
+}
+
+func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) (*v1alpha1.RepoBuild, error) {
+	// packageBuild will be nil if key is deleted from cache
+	if repoBuild == nil {
+		return nil, nil
+	}
+	logrus.Infof("Reconciling '%s' ", repoBuild.Name)
+
+	repoType := repoBuild.Spec.Repository.Type
+	if repoType == "" {
+		// We choose to absorb the error here as the worker would requeue the
+		// resource otherwise. Instead, the next time the resource is updated
+		// the resource will be queued again.
+		utilruntime.HandleError(fmt.Errorf("%s: package name must be specified", key))
+		return nil, nil
+	}
+
+	urls := repoBuild.Spec.Repository.Urls
+	if len(urls) == 0 {
+		// We choose to absorb the error here as the worker would requeue the
+		// resource otherwise. Instead, the next time the resource is updated
+		// the resource will be queued again.
+		utilruntime.HandleError(fmt.Errorf("%s: repository url must be specified", key))
+		return nil, nil
+	}
+
+	// We need to download the repo and get the list of packages that we want to build
+	if len(repoBuild.Spec.Packages) == 0 {
+		n, err := ioutil.TempDir("", "")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(n)
+		// Generate package list, update ourselves with the list and enqueue
+		repo, err := h.getRepo(urls[0], repoType)
+
+		if err != nil {
+			return nil, err
+		}
+
+		opts := &git.CloneOptions{
+			URL:           repoBuild.Spec.GitRepository.Url,
+			ReferenceName: plumbing.NewBranchReferenceName(repoBuild.Spec.GitRepository.Checkout),
+		}
+		// repo.BuildTree
+
+		_, err = git.PlainClone(n, false, opts)
+		if err != nil {
+			return nil, err
+		}
+
+		gitRepoPackages, err := client.TreePackages(filepath.Join(n, repoBuild.Spec.GitRepository.Path))
+		if err != nil {
+			return nil, err
+		}
+
+		list := &client.SearchResult{}
+		for _, p := range repo.BuildTree.GetDatabase().World() {
+			list.Packages = append(list.Packages, client.Package{
+				Name:     p.GetName(),
+				Category: p.GetCategory(),
+				Version:  p.GetVersion(),
+			})
+		}
+		missingPackages := []string{}
+
+		for _, p := range gitRepoPackages.Packages {
+			if !client.Packages(list.Packages).Exist(p) {
+				missingPackages = append(missingPackages, p.String())
+			}
+		}
+
+		repobuildCopy := repoBuild.DeepCopy()
+		repoBuild.Spec.Packages = missingPackages
+
+		_, err = h.repoBuild.Update(repobuildCopy)
+		if err != nil {
+			return nil, err
+		}
+		// Re-enqueue ourselves with the list added
+		h.repoBuild.Enqueue(repoBuild.Namespace, repoBuild.Name)
+
+		return nil, nil
+	}
+
+	// We have the list of packages that we want to build
+	opts := &git.CloneOptions{
+		URL:           repoBuild.Spec.GitRepository.Url,
+		ReferenceName: plumbing.NewBranchReferenceName(repoBuild.Spec.GitRepository.Checkout),
+	}
+
+	missing := &client.SearchResult{}
+
+	n, err := ioutil.TempDir("", "")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(n)
+	// repo.BuildTree
+	db := pkg.NewInMemoryDatabase(false)
+	generalRecipe := tree.NewCompilerRecipe(db)
+
+	_, err = git.PlainClone(n, false, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	err = generalRecipe.Load(filepath.Join(n, repoBuild.Spec.GitRepository.Path))
+	if err != nil {
+		return nil, err
+	}
+
+	compilerSpecs := compilerspec.NewLuetCompilationspecs()
+	// TODO Fill from []packages
+
+	luetCompiler := compiler.NewLuetCompiler(nil, generalRecipe.GetDatabase())
+
+	for _, a := range repoBuild.Spec.Packages {
+		pack, err := helpers.ParsePackageStr(a)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, nil
+		}
+
+		spec, err := luetCompiler.FromPackage(pack)
+		if err != nil {
+			utilruntime.HandleError(err)
+			return nil, nil
+		}
+		missing.Packages = append(missing.Packages, client.Package{
+			Name:     pack.GetName(),
+			Category: pack.GetCategory(),
+			Version:  pack.GetVersion(),
+		})
+		compilerSpecs.Add(spec)
+	}
+	bt, err := luetCompiler.BuildTree(*compilerSpecs)
+	if err != nil {
+		return nil, err
+	}
+
+	toCreate := []*v1alpha1.PackageBuild{}
+	for _, l := range bt.AllLevels() {
+		// TODO: Walk level, and link l to l-1  (waitFor)
+		// and generate package build specs. Set the owner to the RepoBuild
+		// Include ONLY the ones that are contained in missingPackages.
+
+		// TODO: Do not create IF the packagebuild spec is there already
+
+		if l == 0 {
+			//	newPackageBuild() //No wait
+
+			for _, p := range bt.AllInLevel(l) {
+				full, ok := contains(missing, p)
+				if ok {
+
+					toCreate = append(toCreate, newPackageBuild(full, []string{}, repoBuild))
+
+				}
+			}
+		} else {
+			wait := bt.AllInLevel(l - 1) // TODO There is no PV at this stage
+			waitFor := []string{}
+			for _, p := range wait {
+				full, ok := contains(missing, p)
+				if ok {
+					waitFor = append(waitFor, sanitizeName(full))
+				}
+			}
+
+			for _, p := range bt.AllInLevel(l) {
+				full, ok := contains(missing, p)
+				if ok {
+
+					toCreate = append(toCreate, newPackageBuild(full, waitFor, repoBuild))
+
+				}
+			}
+		}
+
+		fmt.Println(strings.Join(bt.AllInLevel(l), " "))
+	}
+
+	// Cycle over toCreate, check if it's not already there, and create!
+	for _, t := range toCreate {
+		_, err := h.controllerCache.Get(t.Namespace, t.Name)
+		if errors.IsNotFound(err) {
+			h.controller.Create(t)
+		}
+	}
+
+	return nil, nil
 }
 
 func (h *Handler) OnPackageBuildChanged(key string, packageBuild *v1alpha1.PackageBuild) (*v1alpha1.PackageBuild, error) {

@@ -15,6 +15,7 @@ func main() {
 			"luet.k8s.io": {
 				Types: []interface{}{
 					v1alpha1.PackageBuild{},
+					v1alpha1.RepoBuild{},
 				},
 				GenerateTypes:     true,
 				GenerateClients:   true,

@@ -27,6 +27,7 @@ import (
 type LuetV1alpha1Interface interface {
 	RESTClient() rest.Interface
 	PackageBuildsGetter
+	RepoBuildsGetter
 }
 
 // LuetV1alpha1Client is used to interact with features provided by the luet.k8s.io group.
@@ -36,6 +37,10 @@ type LuetV1alpha1Client struct {
 
 func (c *LuetV1alpha1Client) PackageBuilds(namespace string) PackageBuildInterface {
 	return newPackageBuilds(c, namespace)
+}
+
+func (c *LuetV1alpha1Client) RepoBuilds(namespace string) RepoBuildInterface {
+	return newRepoBuilds(c, namespace)
 }
 
 // NewForConfig creates a new LuetV1alpha1Client for the given config.
