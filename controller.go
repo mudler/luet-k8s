@@ -146,6 +146,23 @@ func contains(search *client.SearchResult, packagename string) (string, bool) {
 
 }
 
+func existsPackage(s, repo string) bool {
+	pack, err := helpers.ParsePackageStr(s)
+	if err != nil {
+		return false
+	}
+	c := client.Package{
+		Name:     pack.GetName(),
+		Category: pack.GetCategory(),
+		Version:  pack.GetVersion(),
+	}
+	if c.ImageAvailable(repo) {
+		return true
+	}
+
+	return false
+}
+
 func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) (*v1alpha1.RepoBuild, error) {
 	// packageBuild will be nil if key is deleted from cache
 	if repoBuild == nil {
@@ -172,7 +189,7 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 	}
 
 	// We need to download the repo and get the list of packages that we want to build
-	if len(repoBuild.Spec.Packages) == 0 {
+	if !repoBuild.Status.Computed {
 		logrus.Infof("Generating packages to build")
 
 		n, err := ioutil.TempDir("", "")
@@ -205,7 +222,7 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			Hash: plumbing.NewHash(repoBuild.Spec.GitRepository.Checkout),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error chgeckout git repo: %s", err.Error())
+			return nil, fmt.Errorf("error checkout git repo: %s", err.Error())
 		}
 		gitRepoPackages, err := client.TreePackages(filepath.Join(n, repoBuild.Spec.Options.Tree[0]))
 		if err != nil {
@@ -225,7 +242,17 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 
 		for _, p := range gitRepoPackages.Packages {
 			if !client.Packages(list.Packages).Exist(p) {
-				missingPackages = append(missingPackages, p.String())
+				if repoBuild.Spec.Options.FinalImagesRepository != "" {
+					logrus.Infof("Checking if image '%s' exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
+					if !p.ImageAvailable(repoBuild.Spec.Options.FinalImagesRepository) {
+						logrus.Infof("'%s' does not exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
+						missingPackages = append(missingPackages, p.String())
+					} else {
+						logrus.Infof("'%s' exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
+					}
+				} else {
+					missingPackages = append(missingPackages, p.String())
+				}
 			}
 		}
 
@@ -233,6 +260,7 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 
 		repobuildCopy := repoBuild.DeepCopy()
 		repobuildCopy.Spec.Packages = missingPackages
+		repobuildCopy.Status.Computed = true
 		logrus.Infof("Updating status with", missingPackages)
 
 		_, err = h.repoBuild.Update(repobuildCopy)
@@ -240,6 +268,10 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			return nil, err
 		}
 
+		_, err = h.repoBuild.UpdateStatus(repobuildCopy)
+		if err != nil {
+			return nil, err
+		}
 		logrus.Infof("Packages to build", missingPackages)
 		logrus.Infof("Re-enqueue")
 
@@ -306,11 +338,14 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			utilruntime.HandleError(err)
 			return nil, nil
 		}
-		missing.Packages = append(missing.Packages, client.Package{
+
+		p := client.Package{
 			Name:     pack.GetName(),
 			Category: pack.GetCategory(),
 			Version:  pack.GetVersion(),
-		})
+		}
+
+		missing.Packages = append(missing.Packages, p)
 		compilerSpecs.Add(spec)
 	}
 
@@ -319,87 +354,103 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 	}
 	bt := []buildjob{}
 
-	if repoBuild.Status.BuildTree == "" {
-		logrus.Infof("Generating buildtree")
-		// As this is an expensive operation and we are called to re-use this data, store it
-		// in the PackageBuild status
+	if len(repoBuild.Spec.Packages) != 0 {
+		if repoBuild.Status.BuildTree == "" {
+			logrus.Infof("Generating buildtree")
+			// As this is an expensive operation and we are called to re-use this data, store it
+			// in the PackageBuild status
 
-		saved := []buildjob{}
-		bt, err := luetCompiler.BuildTree(*compilerSpecs)
-		if err != nil {
-			return nil, err
-		}
+			saved := []buildjob{}
+			bt, err := luetCompiler.BuildTree(*compilerSpecs)
+			if err != nil {
+				return nil, err
+			}
 
-		toCreate := []*v1alpha1.PackageBuild{}
+			toCreate := []*v1alpha1.PackageBuild{}
 
-		for _, l := range bt.AllLevels() {
-			// TODO: Walk level, and link l to l-1  (waitFor)
-			// and generate package build specs. Set the owner to the RepoBuild
-			// Include ONLY the ones that are contained in missingPackages.
+			for _, l := range bt.AllLevels() {
+				// TODO: Walk level, and link l to l-1  (waitFor)
+				// and generate package build specs. Set the owner to the RepoBuild
+				// Include ONLY the ones that are contained in missingPackages.
 
-			// TODO: Do not create IF the packagebuild spec is there already
-			bj := buildjob{}
+				// TODO: Do not create IF the packagebuild spec is there already
+				bj := buildjob{}
 
-			if l == 0 {
-				//	newPackageBuild() //No wait
-				for _, p := range bt.AllInLevel(l) {
-					full, ok := contains(missing, p)
-					bj.Jobs = append(bj.Jobs, full)
-					if ok {
+				if l == 0 {
+					//	newPackageBuild() //No wait
+					for _, p := range bt.AllInLevel(l) {
+						full, ok := contains(missing, p)
 
-						toCreate = append(toCreate, newPackageBuild(full, []string{}, repoBuild))
+						if repoBuild.Spec.Options.FinalImagesRepository != "" {
+							if existsPackage(p, repoBuild.Spec.Options.FinalImagesRepository) {
+								continue
+							}
+						}
 
+						bj.Jobs = append(bj.Jobs, full)
+						if ok {
+							toCreate = append(toCreate, newPackageBuild(full, []string{}, repoBuild))
+						}
+					}
+				} else {
+					wait := bt.AllInLevel(l - 1) // TODO There is no PV at this stage
+					waitFor := []string{}
+					for _, p := range wait {
+						full, ok := contains(missing, p)
+						if repoBuild.Spec.Options.FinalImagesRepository != "" {
+							if existsPackage(p, repoBuild.Spec.Options.FinalImagesRepository) {
+								continue
+							}
+						}
+						if ok {
+							waitFor = append(waitFor, sanitizeName(full))
+						}
+					}
+
+					for _, p := range bt.AllInLevel(l) {
+						full, ok := contains(missing, p)
+						if repoBuild.Spec.Options.FinalImagesRepository != "" {
+							if existsPackage(p, repoBuild.Spec.Options.FinalImagesRepository) {
+								continue
+							}
+						}
+						bj.Jobs = append(bj.Jobs, full)
+
+						if ok {
+
+							toCreate = append(toCreate, newPackageBuild(full, waitFor, repoBuild))
+
+						}
 					}
 				}
-			} else {
-				wait := bt.AllInLevel(l - 1) // TODO There is no PV at this stage
-				waitFor := []string{}
-				for _, p := range wait {
-					full, ok := contains(missing, p)
+				saved = append(saved, bj)
 
-					if ok {
-						waitFor = append(waitFor, sanitizeName(full))
-					}
-				}
+			}
+			copy := repoBuild.DeepCopy()
+			dat, _ := json.Marshal(saved)
 
-				for _, p := range bt.AllInLevel(l) {
-					full, ok := contains(missing, p)
-					bj.Jobs = append(bj.Jobs, full)
+			copy.Status.BuildTree = base64.RawURLEncoding.EncodeToString(dat)
+			h.repoBuild.UpdateStatus(copy)
 
-					if ok {
-
-						toCreate = append(toCreate, newPackageBuild(full, waitFor, repoBuild))
-
-					}
+			for _, t := range toCreate {
+				_, err := h.controllerCache.Get(t.Namespace, t.Name)
+				if errors.IsNotFound(err) {
+					h.controller.Create(t)
+					continue
 				}
 			}
-			saved = append(saved, bj)
-
-		}
-		copy := repoBuild.DeepCopy()
-		dat, _ := json.Marshal(saved)
-
-		copy.Status.BuildTree = base64.RawURLEncoding.EncodeToString(dat)
-		h.repoBuild.UpdateStatus(copy)
-
-		for _, t := range toCreate {
-			_, err := h.controllerCache.Get(t.Namespace, t.Name)
-			if errors.IsNotFound(err) {
-				h.controller.Create(t)
-				continue
+		} else {
+			b, err := base64.RawURLEncoding.DecodeString(repoBuild.Status.BuildTree)
+			if err != nil {
+				return nil, err
 			}
+			json.Unmarshal(b, &bt)
 		}
-	} else {
-		b, err := base64.RawURLEncoding.DecodeString(repoBuild.Status.BuildTree)
-		if err != nil {
-			return nil, err
-		}
-		json.Unmarshal(b, &bt)
 	}
 
 	total, success, running, fails := 0, 0, 0, 0
 
-	// Cycle over toCreate, check if it's not already there, and create!
+	// Cycle over build tree jobs to check the status
 	for _, t := range bt {
 		for _, j := range t.Jobs {
 			if j == "" {

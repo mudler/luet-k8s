@@ -89,6 +89,18 @@ func genLuetCommand(packageBuild *v1alpha1.PackageBuild) []string {
 		args = append(args, "--all")
 	}
 
+	if packageBuild.Spec.Options.PushFinalImages {
+		args = append(args, "--push-final-images")
+	}
+
+	if packageBuild.Spec.Options.PushFinalImagesWithForce {
+		args = append(args, "--push-final-images-force")
+	}
+
+	if packageBuild.Spec.Options.FinalImagesRepository != "" {
+		args = append(args, "--push-final-images-repository", packageBuild.Spec.Options.FinalImagesRepository)
+	}
+
 	for _, v := range packageBuild.Spec.Options.Values {
 		args = append(args, fmt.Sprintf("--values=/repository%s", v))
 	}

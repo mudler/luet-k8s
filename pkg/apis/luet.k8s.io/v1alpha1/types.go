@@ -78,7 +78,14 @@ type BuildOptions struct {
 	Debug      bool     `json:"debug"`
 	LiveOutput bool     `json:"liveOutput"`
 
-	Push            bool                        `json:"push"`
+	Push bool `json:"push"`
+	// --push-final-images
+	PushFinalImages bool `json:"pushFinalImages"`
+	// --push-final-images-force
+	PushFinalImagesWithForce bool `json:"forcePushFinalImages"`
+	// --push-final-images-repository
+	FinalImagesRepository string `json:"finalImagesRepository"`
+
 	ImageRepository string                      `json:"imageRepository"`
 	Compression     string                      `json:"compression"`
 	Privileged      bool                        `json:"privileged"`
@@ -177,4 +184,5 @@ type BuildStatus struct {
 type RepoBuildStatus struct {
 	State     string `json:"state"`
 	BuildTree string `json:"buildtree"`
+	Computed  bool   `json:"computed"`
 }
