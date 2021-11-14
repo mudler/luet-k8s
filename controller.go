@@ -260,7 +260,6 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 
 		repobuildCopy := repoBuild.DeepCopy()
 		repobuildCopy.Spec.Packages = missingPackages
-		repobuildCopy.Status.Computed = true
 		logrus.Infof("Updating status with", missingPackages)
 
 		_, err = h.repoBuild.Update(repobuildCopy)
@@ -268,7 +267,13 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			return nil, err
 		}
 
-		_, err = h.repoBuild.UpdateStatus(repobuildCopy)
+		rp, err := h.repoBuild.Get(repoBuild.Namespace, repobuildCopy.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+
+		rp.Status.Computed = true
+		_, err = h.repoBuild.UpdateStatus(rp)
 		if err != nil {
 			return nil, err
 		}
