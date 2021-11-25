@@ -31,6 +31,7 @@ func newPackageBuild(packagename string, wait []string, repoBuild *v1alpha1.Repo
 			},
 		},
 		Spec: v1alpha1.BuildSpec{
+			PodScheduler:        repoBuild.Spec.PodScheduler,
 			PackageName:         packagename,
 			Repository:          repoBuild.Spec.GitRepository,
 			Storage:             repoBuild.Spec.Storage,
