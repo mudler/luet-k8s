@@ -361,6 +361,15 @@ func newWorkload(packageBuild *v1alpha1.PackageBuild) *corev1.Pod {
 	// 	}},
 	// }
 
+	dockerd := []string{
+		"dockerd",
+		fmt.Sprintf("--mtu=%s", dockerMTU),
+		"--host=tcp://0.0.0.0:2375"}
+
+	if registryCache != "" {
+		dockerd = append(dockerd, fmt.Sprintf("--registry-mirror=%s", registryCache))
+	}
+
 	dockerPrivileged := true
 	dockerSidecar := corev1.Container{
 		SecurityContext: &corev1.SecurityContext{Privileged: &dockerPrivileged},
@@ -373,7 +382,7 @@ func newWorkload(packageBuild *v1alpha1.PackageBuild) *corev1.Pod {
 		},
 		Name:    "docker",
 		Image:   dockerImage,
-		Command: []string{"dockerd", fmt.Sprintf("--mtu=%s", dockerMTU), "--host=tcp://0.0.0.0:2375"},
+		Command: dockerd,
 
 		VolumeMounts: []corev1.VolumeMount{
 			{
