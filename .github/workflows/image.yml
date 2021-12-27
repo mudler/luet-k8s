@@ -18,7 +18,7 @@ jobs:
       - name: Prepare
         id: prep
         run: |
-          DOCKER_IMAGE=quay.io/mudler/luet-k8s
+          DOCKER_IMAGE=quay.io/mudler/luet-k8s-controller
           VERSION=latest
           SHORTREF=${GITHUB_SHA::8}
 
