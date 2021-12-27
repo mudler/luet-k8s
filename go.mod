@@ -6,6 +6,7 @@ go 1.13
 
 require (
 	github.com/go-git/go-git/v5 v5.4.2
+	github.com/google/go-containerregistry v0.6.0
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/mudler/luet v0.0.0-20211031202108-9857bea5ff59
 	github.com/rancher/lasso v0.0.0-20200905045615-7fcb07d6a20b
