@@ -13,6 +13,7 @@ import (
 
 	git "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/google/go-containerregistry/pkg/crane"
 	helpers "github.com/mudler/luet/cmd/helpers"
 
 	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
@@ -156,7 +157,8 @@ func existsPackage(s, repo string) bool {
 		Category: pack.GetCategory(),
 		Version:  pack.GetVersion(),
 	}
-	if c.ImageAvailable(repo) {
+
+	if _, err := crane.Digest(c.Image(repo), crane.Insecure); err == nil {
 		return true
 	}
 
@@ -244,7 +246,7 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			if !client.Packages(list.Packages).Exist(p) {
 				if repoBuild.Spec.Options.FinalImagesRepository != "" {
 					logrus.Infof("Checking if image '%s' exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
-					if !p.ImageAvailable(repoBuild.Spec.Options.FinalImagesRepository) {
+					if _, err := crane.Digest(p.Image(repoBuild.Spec.Options.FinalImagesRepository), crane.Insecure); err != nil {
 						logrus.Infof("'%s' does not exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
 						missingPackages = append(missingPackages, p.String())
 					} else {
