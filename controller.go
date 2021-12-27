@@ -245,12 +245,14 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 		for _, p := range gitRepoPackages.Packages {
 			if !client.Packages(list.Packages).Exist(p) {
 				if repoBuild.Spec.Options.FinalImagesRepository != "" {
-					logrus.Infof("Checking if image '%s' exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
-					if _, err := crane.Digest(p.Image(repoBuild.Spec.Options.FinalImagesRepository), crane.Insecure); err != nil {
-						logrus.Infof("'%s' does not exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
-						missingPackages = append(missingPackages, p.String())
+					logrus.Infof("Checking if image '%s' exists", p.Image(urls[0]))
+					if _, err := crane.Digest(p.Image(urls[0]), crane.Insecure); err != nil {
+						if _, err := crane.Digest(p.Image(repoBuild.Spec.Options.FinalImagesRepository), crane.Insecure); err != nil {
+							logrus.Infof("'%s' does not exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
+							missingPackages = append(missingPackages, p.String())
+						}
 					} else {
-						logrus.Infof("'%s' exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
+						logrus.Infof("'%s' exists", p.Image(urls[0]))
 					}
 				} else {
 					missingPackages = append(missingPackages, p.String())
