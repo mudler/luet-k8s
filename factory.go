@@ -369,7 +369,9 @@ func newWorkload(packageBuild *v1alpha1.PackageBuild) *corev1.Pod {
 	if registryCache != "" {
 		dockerd = append(dockerd, fmt.Sprintf("--registry-mirror=%s", registryCache))
 	}
-
+	if insecureRegistry != "" {
+		dockerd = append(dockerd, fmt.Sprintf("--insecure-registry=%s", insecureRegistry))
+	}
 	dockerPrivileged := true
 	dockerSidecar := corev1.Container{
 		SecurityContext: &corev1.SecurityContext{Privileged: &dockerPrivileged},
