@@ -21,7 +21,10 @@ import (
 	v1 "github.com/mudler/luet-k8s/pkg/generated/controllers/core/v1"
 	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io/v1alpha1"
 	"github.com/mudler/luet/pkg/api/client"
+	luetContext "github.com/mudler/luet/pkg/api/core/context"
+	"github.com/mudler/luet/pkg/api/core/image"
 	"github.com/mudler/luet/pkg/api/core/types"
+
 	"github.com/mudler/luet/pkg/compiler"
 	compilerspec "github.com/mudler/luet/pkg/compiler/types/spec"
 	installer "github.com/mudler/luet/pkg/installer"
@@ -123,9 +126,17 @@ func (h *Handler) getRepo(url, t string) (*installer.LuetSystemRepository, error
 	}
 	defer os.RemoveAll(tmpdir)
 
-	ctx := types.NewContext()
-	ctx.Config.GetSystem().Rootfs = tmpdir
-	ctx.Config.GetSystem().TmpDirBase = tmpdir
+	ctx := luetContext.NewContext(
+		luetContext.WithConfig(
+			&types.LuetConfig{
+				System: types.LuetSystemConfig{
+					Rootfs:     tmpdir,
+					TmpDirBase: tmpdir,
+				},
+			},
+		),
+	)
+
 	d := installer.NewSystemRepository(types.LuetRepository{
 		Name:   "stub",
 		Type:   t,
@@ -246,8 +257,8 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 			if !client.Packages(list.Packages).Exist(p) {
 				if repoBuild.Spec.Options.FinalImagesRepository != "" {
 					logrus.Infof("Checking if image '%s' exists", p.Image(urls[0]))
-					if _, err := crane.Digest(p.Image(urls[0]), crane.Insecure); err != nil {
-						if _, err := crane.Digest(p.Image(repoBuild.Spec.Options.FinalImagesRepository), crane.Insecure); err != nil {
+					if !image.Available(p.Image(urls[0])) {
+						if !image.Available(p.Image(repoBuild.Spec.Options.FinalImagesRepository)) {
 							logrus.Infof("'%s' does not exists", p.Image(repoBuild.Spec.Options.FinalImagesRepository))
 							missingPackages = append(missingPackages, p.String())
 						}
