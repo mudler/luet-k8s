@@ -132,7 +132,7 @@ func (h *Handler) getRepo(url, t string) (*installer.LuetSystemRepository, error
 				System: types.LuetSystemConfig{
 					Rootfs:        tmpdir,
 					TmpDirBase:    tmpdir,
-					PkgsCachePath: "packages",
+					PkgsCachePath: filepath.Join(tmpdir, "packagestmp"),
 				},
 			},
 		),
