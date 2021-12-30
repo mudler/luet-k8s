@@ -130,8 +130,9 @@ func (h *Handler) getRepo(url, t string) (*installer.LuetSystemRepository, error
 		luetContext.WithConfig(
 			&types.LuetConfig{
 				System: types.LuetSystemConfig{
-					Rootfs:     tmpdir,
-					TmpDirBase: tmpdir,
+					Rootfs:        tmpdir,
+					TmpDirBase:    tmpdir,
+					PkgsCachePath: "packages",
 				},
 			},
 		),
