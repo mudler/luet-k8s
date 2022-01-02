@@ -26,6 +26,7 @@ import (
 	"github.com/mudler/luet/pkg/api/core/types"
 
 	"github.com/mudler/luet/pkg/compiler"
+	"github.com/mudler/luet/pkg/compiler/types/options"
 	compilerspec "github.com/mudler/luet/pkg/compiler/types/spec"
 	installer "github.com/mudler/luet/pkg/installer"
 	pkg "github.com/mudler/luet/pkg/package"
@@ -346,7 +347,12 @@ func (h *Handler) OnRepoBuildChanged(key string, repoBuild *v1alpha1.RepoBuild) 
 	compilerSpecs := compilerspec.NewLuetCompilationspecs()
 	// TODO Fill from []packages
 
-	luetCompiler := compiler.NewLuetCompiler(nil, generalRecipe.GetDatabase())
+	luetCompiler := compiler.NewLuetCompiler(nil, generalRecipe.GetDatabase(),
+		options.WithTemplateFolder(
+			[]string{
+				filepath.Join(n, repoBuild.Spec.Options.Tree[0], "templates"),
+			},
+		))
 
 	for _, a := range repoBuild.Spec.Packages {
 		pack, err := helpers.ParsePackageStr(a)
