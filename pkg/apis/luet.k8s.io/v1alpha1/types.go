@@ -86,6 +86,8 @@ type BuildOptions struct {
 	// --push-final-images-repository
 	FinalImagesRepository string `json:"finalImagesRepository"`
 
+	PullRepository []string `json:"pullRepository"`
+
 	ImageRepository string                      `json:"imageRepository"`
 	Compression     string                      `json:"compression"`
 	Privileged      bool                        `json:"privileged"`
