@@ -360,6 +360,10 @@ func (a *repoBuildGeneratingHandler) Remove(key string, obj *v1alpha1.RepoBuild)
 }
 
 func (a *repoBuildGeneratingHandler) Handle(obj *v1alpha1.RepoBuild, status v1alpha1.RepoBuildStatus) (v1alpha1.RepoBuildStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.RepoBuildGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err

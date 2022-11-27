@@ -360,6 +360,10 @@ func (a *packageBuildGeneratingHandler) Remove(key string, obj *v1alpha1.Package
 }
 
 func (a *packageBuildGeneratingHandler) Handle(obj *v1alpha1.PackageBuild, status v1alpha1.BuildStatus) (v1alpha1.BuildStatus, error) {
+	if !obj.DeletionTimestamp.IsZero() {
+		return status, nil
+	}
+
 	objs, newStatus, err := a.PackageBuildGeneratingHandler(obj, status)
 	if err != nil {
 		return newStatus, err
