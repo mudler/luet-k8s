@@ -11,7 +11,8 @@ require (
 	github.com/rancher/lasso v0.0.0-20210616224652-fc3ebd901c08
 	github.com/rancher/wrangler v0.8.3
 	github.com/sirupsen/logrus v1.8.1
-	k8s.io/api v0.20.6
-	k8s.io/apimachinery v0.20.6
-	k8s.io/client-go v0.20.6
+	k8s.io/api v0.21.0
+	k8s.io/apimachinery v0.21.0
+	k8s.io/client-go v0.21.0
+	sigs.k8s.io/controller-runtime v0.9.0-beta.0
 )

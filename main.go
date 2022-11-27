@@ -7,14 +7,16 @@ import (
 	"context"
 	"flag"
 
+	"github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
 	"github.com/mudler/luet-k8s/pkg/generated/controllers/core"
 	"github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io"
-
+	"github.com/rancher/wrangler/pkg/crd"
 	"github.com/rancher/wrangler/pkg/kubeconfig"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
 var (
@@ -47,13 +49,34 @@ func main() {
 		logrus.Fatalf("Error building kubeconfig: %s", err.Error())
 	}
 
+	restConfig, err := config.GetConfig()
+	if err != nil {
+		logrus.Fatalf("failed to find kubeconfig: %v", err)
+	}
+
 	// Raw k8s client, used to events
 	kubeClient := kubernetes.NewForConfigOrDie(cfg)
 	// Generated apps controller
 	podsfactory := core.NewFactoryFromConfigOrDie(cfg)
 	// Generated sample controller
 	sample := luet.NewFactoryFromConfigOrDie(cfg)
-
+	factory, err := crd.NewFactoryFromClient(restConfig)
+	if err != nil {
+		logrus.Fatalf("Failed to create CRD factory: %v", err)
+	}
+	err = factory.BatchCreateCRDs(ctx,
+		crd.CRD{
+			SchemaObject: v1alpha1.PackageBuild{},
+			Status:       true,
+		},
+		crd.CRD{
+			SchemaObject: v1alpha1.RepoBuild{},
+			Status:       true,
+		},
+	).BatchWait()
+	if err != nil {
+		logrus.Fatalf("Failed to create CRDs: %v", err)
+	}
 	// The typical pattern is to build all your controller/clients then just pass to each handler
 	// the bare minimum of what they need.  This will eventually help with writing tests.  So
 	// don't pass in something like kubeClient, apps, or sample
