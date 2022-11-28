@@ -11,7 +11,6 @@ import (
 	"github.com/mudler/luet-k8s/pkg/generated/controllers/core"
 	"github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io"
 	"github.com/rancher/wrangler/pkg/crd"
-	"github.com/rancher/wrangler/pkg/kubeconfig"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/rancher/wrangler/pkg/start"
 	"github.com/sirupsen/logrus"
@@ -21,7 +20,6 @@ import (
 
 var (
 	masterURL        string
-	kubeconfigFile   string
 	dockerMTU        string
 	registryCache    string
 	dockerImage      string
@@ -34,7 +32,6 @@ func init() {
 	flag.StringVar(&registryCache, "registry-mirrors", "", "Docker registry mirror")
 	flag.StringVar(&insecureRegistry, "insecure-registry", "", "Docker insecure-registry")
 
-	flag.StringVar(&kubeconfigFile, "kubeconfig", "", "Path to a kubeconfig. Only required if out-of-cluster.")
 	flag.StringVar(&masterURL, "master", "", "The address of the Kubernetes API server. Overrides any value in kubeconfig. Only required if out-of-cluster.")
 	flag.Parse()
 }
@@ -43,11 +40,6 @@ func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler(context.Background())
 
-	// This will load the kubeconfig file in a style the same as kubectl
-	cfg, err := kubeconfig.GetNonInteractiveClientConfig(kubeconfigFile).ClientConfig()
-	if err != nil {
-		logrus.Fatalf("Error building kubeconfig: %s", err.Error())
-	}
 
 	restConfig, err := config.GetConfig()
 	if err != nil {
@@ -55,11 +47,11 @@ func main() {
 	}
 
 	// Raw k8s client, used to events
-	kubeClient := kubernetes.NewForConfigOrDie(cfg)
+	kubeClient := kubernetes.NewForConfigOrDie(restConfig)
 	// Generated apps controller
-	podsfactory := core.NewFactoryFromConfigOrDie(cfg)
+	podsfactory := core.NewFactoryFromConfigOrDie(restConfig)
 	// Generated sample controller
-	sample := luet.NewFactoryFromConfigOrDie(cfg)
+	sample := luet.NewFactoryFromConfigOrDie(restConfig)
 	factory, err := crd.NewFactoryFromClient(restConfig)
 	if err != nil {
 		logrus.Fatalf("Failed to create CRD factory: %v", err)
