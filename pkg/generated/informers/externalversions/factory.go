@@ -24,8 +24,8 @@ import (
 	time "time"
 
 	versioned "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned"
+	buildluetio "github.com/mudler/luet-k8s/pkg/generated/informers/externalversions/build.luet.io"
 	internalinterfaces "github.com/mudler/luet-k8s/pkg/generated/informers/externalversions/internalinterfaces"
-	luetk8sio "github.com/mudler/luet-k8s/pkg/generated/informers/externalversions/luet.k8s.io"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -172,9 +172,9 @@ type SharedInformerFactory interface {
 	ForResource(resource schema.GroupVersionResource) (GenericInformer, error)
 	WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool
 
-	Luet() luetk8sio.Interface
+	Build() buildluetio.Interface
 }
 
-func (f *sharedInformerFactory) Luet() luetk8sio.Interface {
-	return luetk8sio.New(f, f.namespace, f.tweakListOptions)
+func (f *sharedInformerFactory) Build() buildluetio.Interface {
+	return buildluetio.New(f, f.namespace, f.tweakListOptions)
 }

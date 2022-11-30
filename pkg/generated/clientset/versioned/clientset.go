@@ -21,7 +21,7 @@ package versioned
 import (
 	"fmt"
 
-	luetv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/luet.k8s.io/v1alpha1"
+	buildv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/build.luet.io/v1alpha1"
 	discovery "k8s.io/client-go/discovery"
 	rest "k8s.io/client-go/rest"
 	flowcontrol "k8s.io/client-go/util/flowcontrol"
@@ -29,19 +29,19 @@ import (
 
 type Interface interface {
 	Discovery() discovery.DiscoveryInterface
-	LuetV1alpha1() luetv1alpha1.LuetV1alpha1Interface
+	BuildV1alpha1() buildv1alpha1.BuildV1alpha1Interface
 }
 
 // Clientset contains the clients for groups. Each group has exactly one
 // version included in a Clientset.
 type Clientset struct {
 	*discovery.DiscoveryClient
-	luetV1alpha1 *luetv1alpha1.LuetV1alpha1Client
+	buildV1alpha1 *buildv1alpha1.BuildV1alpha1Client
 }
 
-// LuetV1alpha1 retrieves the LuetV1alpha1Client
-func (c *Clientset) LuetV1alpha1() luetv1alpha1.LuetV1alpha1Interface {
-	return c.luetV1alpha1
+// BuildV1alpha1 retrieves the BuildV1alpha1Client
+func (c *Clientset) BuildV1alpha1() buildv1alpha1.BuildV1alpha1Interface {
+	return c.buildV1alpha1
 }
 
 // Discovery retrieves the DiscoveryClient
@@ -65,7 +65,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 	}
 	var cs Clientset
 	var err error
-	cs.luetV1alpha1, err = luetv1alpha1.NewForConfig(&configShallowCopy)
+	cs.buildV1alpha1, err = buildv1alpha1.NewForConfig(&configShallowCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +81,7 @@ func NewForConfig(c *rest.Config) (*Clientset, error) {
 // panics if there is an error in the config.
 func NewForConfigOrDie(c *rest.Config) *Clientset {
 	var cs Clientset
-	cs.luetV1alpha1 = luetv1alpha1.NewForConfigOrDie(c)
+	cs.buildV1alpha1 = buildv1alpha1.NewForConfigOrDie(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClientForConfigOrDie(c)
 	return &cs
@@ -90,7 +90,7 @@ func NewForConfigOrDie(c *rest.Config) *Clientset {
 // New creates a new Clientset for the given RESTClient.
 func New(c rest.Interface) *Clientset {
 	var cs Clientset
-	cs.luetV1alpha1 = luetv1alpha1.New(c)
+	cs.buildV1alpha1 = buildv1alpha1.New(c)
 
 	cs.DiscoveryClient = discovery.NewDiscoveryClient(c)
 	return &cs

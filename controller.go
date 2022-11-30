@@ -16,10 +16,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/crane"
 	helpers "github.com/mudler/luet/cmd/helpers"
 
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	luetscheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
+	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/build.luet.io/v1alpha1"
 	v1 "github.com/mudler/luet-k8s/pkg/generated/controllers/core/v1"
-	v1alpha1controller "github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io/v1alpha1"
 	"github.com/mudler/luet/pkg/api/client"
 	luetContext "github.com/mudler/luet/pkg/api/core/context"
 	"github.com/mudler/luet/pkg/api/core/image"

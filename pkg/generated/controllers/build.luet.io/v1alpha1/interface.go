@@ -19,7 +19,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	"github.com/rancher/lasso/pkg/controller"
 	"github.com/rancher/wrangler/pkg/schemes"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -45,8 +45,8 @@ type version struct {
 }
 
 func (c *version) PackageBuild() PackageBuildController {
-	return NewPackageBuildController(schema.GroupVersionKind{Group: "luet.k8s.io", Version: "v1alpha1", Kind: "PackageBuild"}, "packagebuilds", true, c.controllerFactory)
+	return NewPackageBuildController(schema.GroupVersionKind{Group: "build.luet.io", Version: "v1alpha1", Kind: "PackageBuild"}, "packagebuilds", true, c.controllerFactory)
 }
 func (c *version) RepoBuild() RepoBuildController {
-	return NewRepoBuildController(schema.GroupVersionKind{Group: "luet.k8s.io", Version: "v1alpha1", Kind: "RepoBuild"}, "repobuilds", true, c.controllerFactory)
+	return NewRepoBuildController(schema.GroupVersionKind{Group: "build.luet.io", Version: "v1alpha1", Kind: "RepoBuild"}, "repobuilds", true, c.controllerFactory)
 }

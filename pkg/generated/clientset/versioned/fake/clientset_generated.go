@@ -20,8 +20,8 @@ package fake
 
 import (
 	clientset "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned"
-	luetv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/luet.k8s.io/v1alpha1"
-	fakeluetv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/luet.k8s.io/v1alpha1/fake"
+	buildv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/build.luet.io/v1alpha1"
+	fakebuildv1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/build.luet.io/v1alpha1/fake"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/discovery"
@@ -76,7 +76,7 @@ func (c *Clientset) Tracker() testing.ObjectTracker {
 
 var _ clientset.Interface = &Clientset{}
 
-// LuetV1alpha1 retrieves the LuetV1alpha1Client
-func (c *Clientset) LuetV1alpha1() luetv1alpha1.LuetV1alpha1Interface {
-	return &fakeluetv1alpha1.FakeLuetV1alpha1{Fake: &c.Fake}
+// BuildV1alpha1 retrieves the BuildV1alpha1Client
+func (c *Clientset) BuildV1alpha1() buildv1alpha1.BuildV1alpha1Interface {
+	return &fakebuildv1alpha1.FakeBuildV1alpha1{Fake: &c.Fake}
 }

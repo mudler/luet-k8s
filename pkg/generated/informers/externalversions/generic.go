@@ -21,7 +21,7 @@ package externalversions
 import (
 	"fmt"
 
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
 	cache "k8s.io/client-go/tools/cache"
 )
@@ -52,11 +52,11 @@ func (f *genericInformer) Lister() cache.GenericLister {
 // TODO extend this to unknown resources with a client pool
 func (f *sharedInformerFactory) ForResource(resource schema.GroupVersionResource) (GenericInformer, error) {
 	switch resource {
-	// Group=luet.k8s.io, Version=v1alpha1
+	// Group=build.luet.io, Version=v1alpha1
 	case v1alpha1.SchemeGroupVersion.WithResource("packagebuilds"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Luet().V1alpha1().PackageBuilds().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Build().V1alpha1().PackageBuilds().Informer()}, nil
 	case v1alpha1.SchemeGroupVersion.WithResource("repobuilds"):
-		return &genericInformer{resource: resource.GroupResource(), informer: f.Luet().V1alpha1().RepoBuilds().Informer()}, nil
+		return &genericInformer{resource: resource.GroupResource(), informer: f.Build().V1alpha1().RepoBuilds().Informer()}, nil
 
 	}
 

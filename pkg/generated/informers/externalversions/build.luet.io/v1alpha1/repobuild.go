@@ -22,10 +22,10 @@ import (
 	"context"
 	time "time"
 
-	luetk8siov1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	buildluetiov1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	versioned "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned"
 	internalinterfaces "github.com/mudler/luet-k8s/pkg/generated/informers/externalversions/internalinterfaces"
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/generated/listers/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/generated/listers/build.luet.io/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	watch "k8s.io/apimachinery/pkg/watch"
@@ -62,16 +62,16 @@ func NewFilteredRepoBuildInformer(client versioned.Interface, namespace string, 
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.LuetV1alpha1().RepoBuilds(namespace).List(context.TODO(), options)
+				return client.BuildV1alpha1().RepoBuilds(namespace).List(context.TODO(), options)
 			},
 			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
 				if tweakListOptions != nil {
 					tweakListOptions(&options)
 				}
-				return client.LuetV1alpha1().RepoBuilds(namespace).Watch(context.TODO(), options)
+				return client.BuildV1alpha1().RepoBuilds(namespace).Watch(context.TODO(), options)
 			},
 		},
-		&luetk8siov1alpha1.RepoBuild{},
+		&buildluetiov1alpha1.RepoBuild{},
 		resyncPeriod,
 		indexers,
 	)
@@ -82,7 +82,7 @@ func (f *repoBuildInformer) defaultInformer(client versioned.Interface, resyncPe
 }
 
 func (f *repoBuildInformer) Informer() cache.SharedIndexInformer {
-	return f.factory.InformerFor(&luetk8siov1alpha1.RepoBuild{}, f.defaultInformer)
+	return f.factory.InformerFor(&buildluetiov1alpha1.RepoBuild{}, f.defaultInformer)
 }
 
 func (f *repoBuildInformer) Lister() v1alpha1.RepoBuildLister {

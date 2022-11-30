@@ -1,4 +1,4 @@
-apiVersion: luet.k8s.io/v1alpha1
+apiVersion: build.luet.io/v1alpha1
 kind: PackageBuild
 metadata:
   name: test

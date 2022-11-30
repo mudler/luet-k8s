@@ -19,15 +19,17 @@ limitations under the License.
 package v1alpha1
 
 import (
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/tools/cache"
 )
 
 // RepoBuildLister helps list RepoBuilds.
+// All objects returned here must be treated as read-only.
 type RepoBuildLister interface {
 	// List lists all RepoBuilds in the indexer.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.RepoBuild, err error)
 	// RepoBuilds returns an object that can list and get RepoBuilds.
 	RepoBuilds(namespace string) RepoBuildNamespaceLister
@@ -58,10 +60,13 @@ func (s *repoBuildLister) RepoBuilds(namespace string) RepoBuildNamespaceLister 
 }
 
 // RepoBuildNamespaceLister helps list and get RepoBuilds.
+// All objects returned here must be treated as read-only.
 type RepoBuildNamespaceLister interface {
 	// List lists all RepoBuilds in the indexer for a given namespace.
+	// Objects returned here must be treated as read-only.
 	List(selector labels.Selector) (ret []*v1alpha1.RepoBuild, err error)
 	// Get retrieves the RepoBuild from the indexer for a given namespace and name.
+	// Objects returned here must be treated as read-only.
 	Get(name string) (*v1alpha1.RepoBuild, error)
 	RepoBuildNamespaceListerExpansion
 }

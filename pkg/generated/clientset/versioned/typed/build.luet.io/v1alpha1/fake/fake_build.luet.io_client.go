@@ -19,26 +19,26 @@ limitations under the License.
 package fake
 
 import (
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/typed/build.luet.io/v1alpha1"
 	rest "k8s.io/client-go/rest"
 	testing "k8s.io/client-go/testing"
 )
 
-type FakeLuetV1alpha1 struct {
+type FakeBuildV1alpha1 struct {
 	*testing.Fake
 }
 
-func (c *FakeLuetV1alpha1) PackageBuilds(namespace string) v1alpha1.PackageBuildInterface {
+func (c *FakeBuildV1alpha1) PackageBuilds(namespace string) v1alpha1.PackageBuildInterface {
 	return &FakePackageBuilds{c, namespace}
 }
 
-func (c *FakeLuetV1alpha1) RepoBuilds(namespace string) v1alpha1.RepoBuildInterface {
+func (c *FakeBuildV1alpha1) RepoBuilds(namespace string) v1alpha1.RepoBuildInterface {
 	return &FakeRepoBuilds{c, namespace}
 }
 
 // RESTClient returns a RESTClient that is used to communicate
 // with API server by this client implementation.
-func (c *FakeLuetV1alpha1) RESTClient() rest.Interface {
+func (c *FakeBuildV1alpha1) RESTClient() rest.Interface {
 	var ret *rest.RESTClient
 	return ret
 }

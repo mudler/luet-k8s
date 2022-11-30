@@ -21,7 +21,7 @@ To build a package, for example:
 ```bash
 
 $ cat <<EOF | kubectl apply -f -
-apiVersion: luet.k8s.io/v1alpha1
+apiVersion: build.luet.io/v1alpha1
 kind: PackageBuild
 metadata:
   name: test
@@ -40,7 +40,7 @@ EOF
 
 
 ```yaml
-apiVersion: luet.k8s.io/v1alpha1
+apiVersion: build.luet.io/v1alpha1
 kind: PackageBuild
 metadata:
   name: test

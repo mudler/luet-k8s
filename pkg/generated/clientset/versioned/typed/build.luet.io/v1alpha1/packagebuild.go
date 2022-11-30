@@ -22,7 +22,7 @@ import (
 	"context"
 	"time"
 
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	scheme "github.com/mudler/luet-k8s/pkg/generated/clientset/versioned/scheme"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
@@ -57,7 +57,7 @@ type packageBuilds struct {
 }
 
 // newPackageBuilds returns a PackageBuilds
-func newPackageBuilds(c *LuetV1alpha1Client, namespace string) *packageBuilds {
+func newPackageBuilds(c *BuildV1alpha1Client, namespace string) *packageBuilds {
 	return &packageBuilds{
 		client: c.RESTClient(),
 		ns:     namespace,

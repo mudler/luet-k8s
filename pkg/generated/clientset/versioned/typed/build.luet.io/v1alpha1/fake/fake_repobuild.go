@@ -21,7 +21,7 @@ package fake
 import (
 	"context"
 
-	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	v1alpha1 "github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	labels "k8s.io/apimachinery/pkg/labels"
 	schema "k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,13 +32,13 @@ import (
 
 // FakeRepoBuilds implements RepoBuildInterface
 type FakeRepoBuilds struct {
-	Fake *FakeLuetV1alpha1
+	Fake *FakeBuildV1alpha1
 	ns   string
 }
 
-var repobuildsResource = schema.GroupVersionResource{Group: "luet.k8s.io", Version: "v1alpha1", Resource: "repobuilds"}
+var repobuildsResource = schema.GroupVersionResource{Group: "build.luet.io", Version: "v1alpha1", Resource: "repobuilds"}
 
-var repobuildsKind = schema.GroupVersionKind{Group: "luet.k8s.io", Version: "v1alpha1", Kind: "RepoBuild"}
+var repobuildsKind = schema.GroupVersionKind{Group: "build.luet.io", Version: "v1alpha1", Kind: "RepoBuild"}
 
 // Get takes name of the repoBuild, and returns the corresponding repoBuild object, and an error if there is any.
 func (c *FakeRepoBuilds) Get(ctx context.Context, name string, options v1.GetOptions) (result *v1alpha1.RepoBuild, err error) {

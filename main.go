@@ -7,9 +7,9 @@ import (
 	"context"
 	"flag"
 
-	"github.com/mudler/luet-k8s/pkg/apis/luet.k8s.io/v1alpha1"
+	"github.com/mudler/luet-k8s/pkg/apis/build.luet.io/v1alpha1"
+	luet "github.com/mudler/luet-k8s/pkg/generated/controllers/build.luet.io"
 	"github.com/mudler/luet-k8s/pkg/generated/controllers/core"
-	"github.com/mudler/luet-k8s/pkg/generated/controllers/luet.k8s.io"
 	"github.com/rancher/wrangler/pkg/crd"
 	"github.com/rancher/wrangler/pkg/signals"
 	"github.com/rancher/wrangler/pkg/start"
@@ -39,7 +39,6 @@ func init() {
 func main() {
 	// set up signals so we handle the first shutdown signal gracefully
 	ctx := signals.SetupSignalHandler(context.Background())
-
 
 	restConfig, err := config.GetConfig()
 	if err != nil {
@@ -75,8 +74,8 @@ func main() {
 	Register(ctx,
 		kubeClient.CoreV1().Events(""),
 		podsfactory.Core().V1().Pod(),
-		sample.Luet().V1alpha1().PackageBuild(),
-		sample.Luet().V1alpha1().RepoBuild())
+		sample.Build().V1alpha1().PackageBuild(),
+		sample.Build().V1alpha1().RepoBuild())
 
 	// Start all the controllers
 	if err := start.All(ctx, 2, podsfactory, sample); err != nil {
